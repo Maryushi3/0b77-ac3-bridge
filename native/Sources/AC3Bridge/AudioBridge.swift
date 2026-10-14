@@ -25,6 +25,7 @@ final class AudioBridge: @unchecked Sendable {
     private var _playing = false
     private var _drops = 0
     private var _underruns = 0
+    private var _inPeak: Float = 0 // max |sample| on input since last stats read
 
     private let inCond = NSCondition()
     private var _inQueue: [Data] = []      // raw 6ch s16le chunks for ffmpeg stdin
@@ -44,12 +45,17 @@ final class AudioBridge: @unchecked Sendable {
         let drops: Int
         let underruns: Int
         let playing: Bool
+        /// 0…1 input peak over the last window (stuck at 0 = silence — check mic permission).
+        let inPeak: Float
     }
 
     var stats: Stats {
-        lock.lock(); defer { lock.unlock() }
-        return Stats(fill: _buf.count, maxBuf: maxBuf, drops: _drops,
-                     underruns: _underruns, playing: _playing)
+        lock.lock()
+        let s = Stats(fill: _buf.count, maxBuf: maxBuf, drops: _drops,
+                      underruns: _underruns, playing: _playing, inPeak: _inPeak)
+        _inPeak = 0
+        lock.unlock()
+        return s
     }
 
     var isAlive: Bool {
@@ -77,7 +83,7 @@ final class AudioBridge: @unchecked Sendable {
         lock.lock()
         _running = true
         _buf.removeAll(); _cur = nil; _pos = 0; _playing = false
-        _drops = 0; _underruns = 0
+        _drops = 0; _underruns = 0; _inPeak = 0
         lock.unlock()
         inCond.lock(); _inQueue.removeAll(); inCond.unlock()
         encoder = enc
@@ -206,6 +212,18 @@ final class AudioBridge: @unchecked Sendable {
     private func handleInput(_ ablPtr: UnsafePointer<AudioBufferList>) {
         let s16 = convertInputToS16LE(ablPtr)
         guard !s16.isEmpty else { return }
+        // Input peak meter (also doubles as a capture-health signal).
+        var peak: Float = 0
+        s16.withUnsafeBytes { (p: UnsafeRawBufferPointer) in
+            let s = p.bindMemory(to: Int16.self)
+            for i in 0..<s.count {
+                let a = abs(Float(Int(s[i]))) / 32768.0
+                if a > peak { peak = a }
+            }
+        }
+        lock.lock()
+        if peak > _inPeak { _inPeak = peak }
+        lock.unlock()
         inCond.lock()
         _inQueue.append(s16)
         if _inQueue.count > 200 { _inQueue.removeFirst() }  // ffmpeg stalled

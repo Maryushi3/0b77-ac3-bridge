@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreAudio
 import SwiftUI
 
@@ -72,7 +73,18 @@ final class BridgeController: ObservableObject {
             stop()
             return
         }
+        Task { await startFlow(settings: settings) }
+    }
+
+    /// Mic permission (needed even for virtual inputs like BlackHole) is async — hence the split.
+    private func startFlow(settings: BridgeSettings) async {
         lastError = nil
+        let granted = await AVCaptureDevice.requestAccess(for: .audio)
+        guard granted else {
+            lastError = "Microphone permission denied — enable AC3Bridge in System Settings > Privacy & Security > Microphone. (macOS requires it for any audio capture, including BlackHole.)"
+            speakerConfirmPending = false
+            return
+        }
         guard let inID = selectedInputID, let outID = selectedOutputID else {
             lastError = "Pick input and output devices."
             return
@@ -160,7 +172,13 @@ final class BridgeController: ObservableObject {
             }
         }
         let s = b.stats
-        statusLine = "Running (\(s.playing ? "streaming" : "buffering")) | buffer \(s.fill)/\(s.maxBuf) frames | dropped \(s.drops) | underruns \(s.underruns)"
+        let peakDb: String
+        if s.inPeak <= 0.0001 {
+            peakDb = "in silent"
+        } else {
+            peakDb = String(format: "in peak %.0f dBFS", 20 * log10(s.inPeak))
+        }
+        statusLine = "Running (\(s.playing ? "streaming" : "buffering")) | buffer \(s.fill)/\(s.maxBuf) frames | dropped \(s.drops) | underruns \(s.underruns) | \(peakDb)"
     }
 }
 

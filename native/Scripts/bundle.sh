@@ -37,6 +37,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSMicrophoneUsageDescription</key><string>AC3Bridge captures 6-channel audio from the virtual input device (e.g. BlackHole) to encode it to AC-3. macOS requires microphone permission for any audio capture, including virtual devices.</string>
 </dict>
 </plist>
 PLIST
