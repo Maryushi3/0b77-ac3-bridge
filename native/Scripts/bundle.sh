@@ -1,11 +1,12 @@
 #!/bin/sh
-# Build AC3Bridge.app (menu-bar, LSUIElement) from SwiftPM output + bundle ffmpeg sidecar.
+# Build 0B77.app (menu-bar, LSUIElement) from SwiftPM output. Homebrew ffmpeg
+# stays a runtime dependency (see FFmpegLocator).
 # Usage: Scripts/bundle.sh [configuration]  (default: release)
 set -eu
 cd "$(dirname "$0")/.."
 
 CFG="${1:-release}"
-APP="AC3Bridge.app"
+APP="0B77.app"
 BUILD=".build/$CFG"
 
 swift build -c "$CFG"
@@ -19,8 +20,8 @@ if [ ! -f "$BIN" ]; then
   # SwiftPM names binary dir differently on some toolchains; find it.
   BIN="$(find .build -name AC3Bridge -type f -path "*$CFG*" | head -1)"
 fi
-cp "$BIN" "$APP/Contents/MacOS/AC3Bridge"
-chmod +x "$APP/Contents/MacOS/AC3Bridge"
+cp "$BIN" "$APP/Contents/MacOS/0B77"
+chmod +x "$APP/Contents/MacOS/0B77"
 
 # Info.plist (menu-bar only: no dock icon)
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -28,9 +29,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleExecutable</key><string>AC3Bridge</string>
+  <key>CFBundleExecutable</key><string>0B77</string>
   <key>CFBundleIdentifier</key><string>com.local.ac3bridge</string>
-  <key>CFBundleName</key><string>AC3Bridge</string>
+  <key>CFBundleName</key><string>0B77</string>
+  <key>CFBundleDisplayName</key><string>0B77</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>

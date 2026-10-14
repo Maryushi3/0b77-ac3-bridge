@@ -4,5 +4,5 @@ __pycache__/
 *.pyo
 .DS_Store
 native/.build/
-native/AC3Bridge.app/
+native/*.app/
 native/*.dmg

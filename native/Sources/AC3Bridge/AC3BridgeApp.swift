@@ -14,7 +14,7 @@ struct AC3BridgeApp: App {
                 .environmentObject(controller)
                 .frame(width: 380)
         } label: {
-            Label(controller.isRunning ? "AC-3 ●" : "AC-3",
+            Label(controller.isRunning ? "0B77 ●" : "0B77",
                   systemImage: controller.isRunning ? "waveform" : "cable.connector.horizontal")
         }
     }
@@ -35,6 +35,8 @@ final class BridgeController: ObservableObject {
     @Published var speakerConfirmPending = false
     /// Frozen at Start for the running summary line.
     @Published var runSummary = ""
+    /// Mirrors BridgeSettings.usePolish (synced by the view); drives all controller strings.
+    @Published var uiPolish = false
 
     private var bridge: AudioBridge?
     private var timer: Timer?
@@ -61,20 +63,21 @@ final class BridgeController: ObservableObject {
     /// Preflight warnings for the current selection (ffmpeg, sample rates).
     /// Never blocks Start — the 18i20 is shared, so we warn instead of forcing.
     func preflightWarnings() -> [String] {
+        let t = T(pl: uiPolish)
         var w: [String] = []
         if FFmpegLocator.find() == nil {
-            w.append("ffmpeg not found — run: brew install ffmpeg")
+            w.append(t.ffmpegMissing)
         }
         if let inID = selectedInputID {
             let r = DeviceManager.nominalSampleRate(inID)
             if r != 0, abs(r - AudioBridge.sampleRate) > 1 {
-                w.append(String(format: "Input at %.0f Hz — set 48 kHz in Audio MIDI Setup", r))
+                w.append(t.inputRate(r))
             }
         }
         if let outID = selectedOutputID {
             let r = DeviceManager.nominalSampleRate(outID)
             if r != 0, abs(r - AudioBridge.sampleRate) > 1 {
-                w.append(String(format: "Output at %.0f Hz — set 48 kHz in Audio MIDI Setup", r))
+                w.append(t.outputRate(r))
             }
         }
         return w
@@ -112,32 +115,33 @@ final class BridgeController: ObservableObject {
 
     /// Mic permission (needed even for virtual inputs like BlackHole) is async — hence the split.
     private func startFlow(settings: BridgeSettings) async {
+        let t = T(pl: uiPolish)
         lastError = nil
         let granted = await AVCaptureDevice.requestAccess(for: .audio)
         guard granted else {
-            lastError = "Microphone permission denied — enable AC3Bridge in System Settings > Privacy & Security > Microphone. (macOS requires it for any audio capture, including BlackHole.)"
+            lastError = t.micDenied
             speakerConfirmPending = false
             return
         }
         guard let inID = selectedInputID, let outID = selectedOutputID else {
-            lastError = "Pick input and output devices."
+            lastError = t.pickDevices
             return
         }
         // Safeguard: same device for in+out would loop the encoded blast back into the encoder.
         if inID == outID {
-            lastError = "Input and output can't be the same device."
+            lastError = t.sameDevice
             speakerConfirmPending = false
             return
         }
         guard let inDev = inputDevices.first(where: { $0.id == inID }),
               let outDev = outputDevices.first(where: { $0.id == outID })
         else {
-            lastError = "Selected device disappeared. Hit Refresh."
+            lastError = t.deviceGone
             speakerConfirmPending = false
             return
         }
         if settings.firstChannel + 1 > outDev.outputChannels {
-            lastError = "Output device only has \(outDev.outputChannels) channels."
+            lastError = t.onlyChannels(outDev.outputChannels)
             speakerConfirmPending = false
             return
         }
@@ -145,7 +149,7 @@ final class BridgeController: ObservableObject {
         // encoded AC-3 there is full-scale noise. Require a second press.
         if settings.firstChannel <= 2, !speakerConfirmPending {
             speakerConfirmPending = true
-            lastError = "Channels 1–2 feed your speakers — encoded AC-3 there is full-scale noise. Press Start again to confirm."
+            lastError = t.speakerConfirm
             return
         }
         speakerConfirmPending = false
@@ -155,12 +159,13 @@ final class BridgeController: ObservableObject {
         do {
             try b.start()
         } catch {
-            lastError = "Could not start:\n\(error.localizedDescription)"
+            lastError = t.couldNotStart(error.localizedDescription)
             return
         }
         bridge = b
         isRunning = true
-        runSummary = "\(inDev.name) → \(outDev.name) ch \(settings.firstChannel)–\(settings.firstChannel + 1) @ \(settings.bitrate) kbps"
+        runSummary = t.runSummary(inName: inDev.name, outName: outDev.name,
+                                  ch: settings.firstChannel, bitrate: settings.bitrate)
         watchInID = inID
         watchOutID = outID
         watchInRate = DeviceManager.nominalSampleRate(inID)
@@ -173,7 +178,7 @@ final class BridgeController: ObservableObject {
         bridge?.stop()
         bridge = nil
         isRunning = false
-        statusLine = "Stopped"
+        statusLine = T(pl: uiPolish).stopped
         runSummary = ""
         speakerConfirmPending = false
         watchInID = nil
@@ -186,10 +191,11 @@ final class BridgeController: ObservableObject {
 
     private func tick() {
         guard let b = bridge else { return }
+        let t = T(pl: uiPolish)
         if !b.isAlive {
-            let msg = b.lastEncoderError.isEmpty ? "ffmpeg exited" : b.lastEncoderError
+            let msg = b.lastEncoderError.isEmpty ? t.ffmpegExited : b.lastEncoderError
             stop()
-            statusLine = "Stopped: \(msg)"
+            statusLine = "\(t.stopped): \(msg)"
             lastError = msg
             return
         }
@@ -201,20 +207,21 @@ final class BridgeController: ObservableObject {
                 || DeviceManager.nominalSampleRate(wOut) != watchOutRate
             if !stillThere.contains(wIn) || !stillThere.contains(wOut) || ratesChanged {
                 stop()
-                statusLine = "Stopped: audio device changed (replug or sample-rate flip)"
-                lastError = "Audio device changed — bridge stopped to protect the outputs. Hit Refresh, verify channels, Start again."
+                statusLine = t.stoppedDeviceChanged
+                lastError = t.deviceChangedHelp
                 refreshDevices()
                 return
             }
         }
         let s = b.stats
-        let peakDb: String
+        let mode = s.playing ? t.streaming : t.buffering
+        let peak: String
         if s.inPeak <= 0.0001 {
-            peakDb = "in silent"
+            peak = t.inputSilent
         } else {
-            peakDb = String(format: "in peak %.0f dBFS", 20 * log10(s.inPeak))
+            peak = t.inputPeak(Int((20 * log10(s.inPeak)).rounded()))
         }
-        statusLine = "Running (\(s.playing ? "streaming" : "buffering")) | buffer \(s.fill)/\(s.maxBuf) frames | dropped \(s.drops) | underruns \(s.underruns) | \(peakDb)"
+        statusLine = t.running(mode, fill: s.fill, max: s.maxBuf, drops: s.drops, underruns: s.underruns, peak: peak)
     }
 }
 
@@ -225,8 +232,21 @@ struct PopoverView: View {
     @EnvironmentObject var controller: BridgeController
 
     var body: some View {
+        let t = T(pl: settings.usePolish)
         VStack(alignment: .leading, spacing: 8) {
-            Text("AC-3 Bridge").font(.headline)
+            HStack {
+                Text(t.appName).font(.headline)
+                Text(t.appSubtitle).font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Picker(t.languageLabel, selection: $settings.language) {
+                    Text(t.languageSystem).tag("system")
+                    Text("English").tag("en")
+                    Text("Polski").tag("pl")
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+            }
             if controller.isRunning, !controller.runSummary.isEmpty {
                 Text(controller.runSummary)
                     .font(.caption)
@@ -240,52 +260,52 @@ struct PopoverView: View {
                 }
             }
 
-            Picker("Input (6ch)", selection: deviceBinding(
+            Picker(t.inputLabel, selection: deviceBinding(
                 devices: controller.inputDevices,
                 selection: $controller.selectedInputID)) {
                 ForEach(controller.inputDevices) { d in
-                    Text("\(d.name) (\(d.inputChannels) in)").tag(Optional(d.id))
+                    Text("\(d.name) (\(t.channelsIn(d.inputChannels)))").tag(Optional(d.id))
                 }
             }
             .pickerStyle(.menu)
             .disabled(controller.isRunning)
 
-            Picker("Output", selection: deviceBinding(
+            Picker(t.outputLabel, selection: deviceBinding(
                 devices: controller.outputDevices,
                 selection: $controller.selectedOutputID)) {
                 ForEach(controller.outputDevices) { d in
-                    Text("\(d.name) (\(d.outputChannels) out)").tag(Optional(d.id))
+                    Text("\(d.name) (\(t.channelsOut(d.outputChannels)))").tag(Optional(d.id))
                 }
             }
             .pickerStyle(.menu)
             .disabled(controller.isRunning)
 
             HStack {
-                Stepper("First output channel: \(settings.firstChannel) (uses \(settings.firstChannel)–\(settings.firstChannel + 1))",
+                Stepper(t.firstChannel(settings.firstChannel),
                         value: $settings.firstChannel, in: 1...63)
             }
             .disabled(controller.isRunning)
 
             HStack {
-                Picker("AC-3 bitrate", selection: $settings.bitrate) {
+                Picker(t.bitrateLabel, selection: $settings.bitrate) {
                     ForEach([384, 448, 576, 640], id: \.self) { b in
-                        Text("\(b) kbps").tag(b)
+                        Text(t.bitrateUnit(b)).tag(b)
                     }
                 }
                 .pickerStyle(.menu)
                 .disabled(controller.isRunning)
-                Stepper("Buffer: \(settings.prefill) (~\(settings.prefill * 32) ms)",
+                Stepper(t.buffer(settings.prefill),
                         value: $settings.prefill, in: 1...8)
                     .onChange(of: settings.prefill) { _, n in controller.applyPrefill(n) }
             }
 
             HStack {
-                Button(controller.isRunning ? "Stop"
-                       : controller.speakerConfirmPending ? "Confirm: start on 1–2" : "Start") {
+                Button(controller.isRunning ? t.stop
+                       : controller.speakerConfirmPending ? t.confirmSpeakers : t.start) {
                     controller.toggle(settings: settings)
                 }
                     .keyboardShortcut(.defaultAction)
-                Button("Refresh devices") {
+                Button(t.refresh) {
                     controller.refreshDevices()
                     controller.restoreSelection(settings: settings)
                 }
@@ -299,11 +319,15 @@ struct PopoverView: View {
             if let err = controller.lastError {
                 Text(err).font(.caption).foregroundStyle(.red).lineLimit(4)
             }
-            Button("Quit") { NSApplication.shared.terminate(nil) }
+            Button(t.quit) { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.link)
         }
         .padding(12)
-        .onAppear { controller.restoreSelection(settings: settings) }
+        .onAppear {
+            controller.uiPolish = settings.usePolish
+            controller.restoreSelection(settings: settings)
+        }
+        .onChange(of: settings.language) { _, _ in controller.uiPolish = settings.usePolish }
     }
 
     private func deviceBinding(devices _: [AudioDeviceInfo],

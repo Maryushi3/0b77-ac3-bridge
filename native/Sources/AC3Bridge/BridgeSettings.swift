@@ -17,6 +17,10 @@ final class BridgeSettings: ObservableObject {
     @Published var prefill: Int {
         didSet { defaults.set(prefill, forKey: "prefill") }
     }
+    /// "system" | "en" | "pl"
+    @Published var language: String {
+        didSet { defaults.set(language, forKey: "language") }
+    }
 
     private let defaults = UserDefaults.standard
 
@@ -29,5 +33,19 @@ final class BridgeSettings: ObservableObject {
         bitrate = br == 0 ? 640 : br
         let pf = defaults.integer(forKey: "prefill")
         prefill = pf == 0 ? 1 : pf
+        language = defaults.string(forKey: "language") ?? "system"
+    }
+
+    var usePolish: Bool {
+        switch language {
+        case "pl": return true
+        case "en": return false
+        default:
+            if #available(macOS 13, *) {
+                return Locale.current.language.languageCode?.identifier == "pl"
+            } else {
+                return Locale.current.languageCode == "pl"
+            }
+        }
     }
 }
