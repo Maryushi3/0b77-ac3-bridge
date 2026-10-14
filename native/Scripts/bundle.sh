@@ -41,21 +41,13 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# ffmpeg sidecar: prefer Homebrew arm64 binary, copy + fix dylib closure.
-FF="${FFMPEG:-$(command -v ffmpeg || true)}"
-if [ -n "$FF" ]; then
-  echo "Bundling ffmpeg from $FF"
-  cp "$FF" "$APP/Contents/MacOS/ffmpeg"
-  chmod +x "$APP/Contents/MacOS/ffmpeg"
-  # Re-homebrew brewed dylibs to @executable_path when dylibbundler is available; else warn.
-  if command -v dylibbundler >/dev/null 2>&1; then
-    dylibbundler -od -b -x "$APP/Contents/MacOS/ffmpeg" -d "$APP/Contents/libs/" -p "@executable_path/../libs/" || true
-  else
-    echo "NOTE: dylibbundler not installed — bundled ffmpeg still links /opt/homebrew dylibs."
-    echo "      Install receivers need 'brew install ffmpeg' until you 'brew install dylibbundler' and re-run."
-  fi
+# ffmpeg sidecar: NOT bundled — receivers `brew install ffmpeg`.
+# The app looks up ffmpeg at runtime (bundled path skipped, then
+# /opt/homebrew/bin, /usr/local/bin, PATH). Fail-fast with install hint.
+if command -v ffmpeg >/dev/null 2>&1; then
+  echo "ffmpeg found: $(command -v ffmpeg) (runtime dependency, not bundled)"
 else
-  echo "WARNING: no ffmpeg found — app will fall back to runtime lookup."
+  echo "WARNING: no ffmpeg installed — 'brew install ffmpeg' before running."
 fi
 
 # Ad-hoc sign so it launches on other Macs without a re-sign step (still needs Right-click > Open).
