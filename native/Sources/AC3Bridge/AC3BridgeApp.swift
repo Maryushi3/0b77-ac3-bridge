@@ -8,11 +8,14 @@ struct AC3BridgeApp: App {
     @StateObject private var controller = BridgeController()
 
     var body: some Scene {
-        MenuBarExtra("AC-3 Bridge", systemImage: "cable.connector.horizontal") {
+        MenuBarExtra {
             PopoverView()
                 .environmentObject(settings)
                 .environmentObject(controller)
                 .frame(width: 380)
+        } label: {
+            Label(controller.isRunning ? "AC-3 ●" : "AC-3",
+                  systemImage: controller.isRunning ? "waveform" : "cable.connector.horizontal")
         }
     }
 }
@@ -30,6 +33,8 @@ final class BridgeController: ObservableObject {
     @Published var selectedOutputID: AudioDeviceID?
     /// Two-step arm: starting on ch 1-2 (speakers) needs a second press.
     @Published var speakerConfirmPending = false
+    /// Frozen at Start for the running summary line.
+    @Published var runSummary = ""
 
     private var bridge: AudioBridge?
     private var timer: Timer?
@@ -41,9 +46,38 @@ final class BridgeController: ObservableObject {
 
     init() {
         refreshDevices()
+        // Clean shutdown: stop HAL IOProcs + ffmpeg child before the app exits,
+        // otherwise the child keeps running and the device stays claimed.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stop() }
+        }
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
+    }
+
+    /// Preflight warnings for the current selection (ffmpeg, sample rates).
+    /// Never blocks Start — the 18i20 is shared, so we warn instead of forcing.
+    func preflightWarnings() -> [String] {
+        var w: [String] = []
+        if FFmpegLocator.find() == nil {
+            w.append("ffmpeg not found — run: brew install ffmpeg")
+        }
+        if let inID = selectedInputID {
+            let r = DeviceManager.nominalSampleRate(inID)
+            if r != 0, abs(r - AudioBridge.sampleRate) > 1 {
+                w.append(String(format: "Input at %.0f Hz — set 48 kHz in Audio MIDI Setup", r))
+            }
+        }
+        if let outID = selectedOutputID {
+            let r = DeviceManager.nominalSampleRate(outID)
+            if r != 0, abs(r - AudioBridge.sampleRate) > 1 {
+                w.append(String(format: "Output at %.0f Hz — set 48 kHz in Audio MIDI Setup", r))
+            }
+        }
+        return w
     }
 
     func refreshDevices() {
@@ -126,6 +160,7 @@ final class BridgeController: ObservableObject {
         }
         bridge = b
         isRunning = true
+        runSummary = "\(inDev.name) → \(outDev.name) ch \(settings.firstChannel)–\(settings.firstChannel + 1) @ \(settings.bitrate) kbps"
         watchInID = inID
         watchOutID = outID
         watchInRate = DeviceManager.nominalSampleRate(inID)
@@ -139,6 +174,7 @@ final class BridgeController: ObservableObject {
         bridge = nil
         isRunning = false
         statusLine = "Stopped"
+        runSummary = ""
         speakerConfirmPending = false
         watchInID = nil
         watchOutID = nil
@@ -191,6 +227,18 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("AC-3 Bridge").font(.headline)
+            if controller.isRunning, !controller.runSummary.isEmpty {
+                Text(controller.runSummary)
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                    .lineLimit(2)
+            }
+            let warnings = controller.preflightWarnings()
+            if !controller.isRunning, !warnings.isEmpty {
+                ForEach(warnings, id: \.self) { w in
+                    Text("⚠ \(w)").font(.caption).foregroundStyle(.orange).lineLimit(2)
+                }
+            }
 
             Picker("Input (6ch)", selection: deviceBinding(
                 devices: controller.inputDevices,
@@ -200,6 +248,7 @@ struct PopoverView: View {
                 }
             }
             .pickerStyle(.menu)
+            .disabled(controller.isRunning)
 
             Picker("Output", selection: deviceBinding(
                 devices: controller.outputDevices,
@@ -209,11 +258,13 @@ struct PopoverView: View {
                 }
             }
             .pickerStyle(.menu)
+            .disabled(controller.isRunning)
 
             HStack {
                 Stepper("First output channel: \(settings.firstChannel) (uses \(settings.firstChannel)–\(settings.firstChannel + 1))",
                         value: $settings.firstChannel, in: 1...63)
             }
+            .disabled(controller.isRunning)
 
             HStack {
                 Picker("AC-3 bitrate", selection: $settings.bitrate) {
@@ -222,6 +273,7 @@ struct PopoverView: View {
                     }
                 }
                 .pickerStyle(.menu)
+                .disabled(controller.isRunning)
                 Stepper("Buffer: \(settings.prefill) (~\(settings.prefill * 32) ms)",
                         value: $settings.prefill, in: 1...8)
                     .onChange(of: settings.prefill) { _, n in controller.applyPrefill(n) }
@@ -237,6 +289,7 @@ struct PopoverView: View {
                     controller.refreshDevices()
                     controller.restoreSelection(settings: settings)
                 }
+                .disabled(controller.isRunning)
             }
 
             Text(controller.statusLine)
