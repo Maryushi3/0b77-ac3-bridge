@@ -26,7 +26,8 @@ Polish + English UI (header picker, follows the system locale by default).
 Audio MIDI Setup (do once):
 
 - BlackHole 16ch: 48000 Hz, speakers configured as 5.1 (L R C LFE Ls Rs on
-  channels 1–6). Set it as the system/movie-player output.
+  channels 1–6 — this is most likely just the default 5.1 configuration).
+  Set it as the system/movie-player output.
 - Scarlett (or your DAC): 48000 Hz. System volume 100%.
 
 ## Why BlackHole
