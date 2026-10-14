@@ -30,7 +30,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>0B77</string>
-  <key>CFBundleIdentifier</key><string>com.local.ac3bridge</string>
+  <key>CFBundleIdentifier</key><string>com.local.0b77</string>
   <key>CFBundleName</key><string>0B77</string>
   <key>CFBundleDisplayName</key><string>0B77</string>
   <key>CFBundleVersion</key><string>1</string>
