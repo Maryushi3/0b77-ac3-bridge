@@ -8,6 +8,9 @@ cd "$(dirname "$0")/.."
 CFG="${1:-release}"
 APP="0B77.app"
 BUILD=".build/$CFG"
+# Release version baked into the plist; CI passes VERSION=vX.Y.Z worth.
+# Local default matches the current release line.
+VER="${VERSION:-0.2.0}"
 
 swift build -c "$CFG"
 
@@ -23,8 +26,8 @@ fi
 cp "$BIN" "$APP/Contents/MacOS/0B77"
 chmod +x "$APP/Contents/MacOS/0B77"
 
-# Info.plist (menu-bar only: no dock icon)
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+# Info.plist (menu-bar only: no dock icon). Unquoted heredoc: $VER expands.
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -34,7 +37,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>0B77</string>
   <key>CFBundleDisplayName</key><string>0B77</string>
   <key>CFBundleVersion</key><string>1</string>
-  <key>CFBundleShortVersionString</key><string>0.2.0</string>
+  <key>CFBundleShortVersionString</key><string>$VER</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSUIElement</key><true/>
   <key>CFBundleIconFile</key><string>0B77</string>

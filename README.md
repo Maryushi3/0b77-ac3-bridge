@@ -91,6 +91,16 @@ bridge — devices may not be up yet, and streaming onto a changed layout is
 exactly what the watchdog guards against. Logs land in
 `~/Library/Logs/0B77.{out,err}.log`.
 
+## CI & releases
+
+- Every push/PR builds on GitHub Actions (`macos-15`: SwiftPM + bundle + DMG
+  smoke, DMG kept as an artifact).
+- Nothing releases except strict `vX.Y.Z` tags: `git push origin v0.3.0`
+  builds the DMG and publishes the GitHub Release. Branch pushes never ship.
+- Release text comes from the matching `CHANGELOG.md` section (write it under
+  `## [Unreleased]` as you go); a missing section falls back to generated
+  notes. Local dry run: `./Scripts/bundle.sh release && ./Scripts/make-dmg.sh`.
+
 ## How it works
 
 ```

@@ -12,6 +12,7 @@ DMG="0B77-$VER-macOS-arm64.dmg"
   echo "ERROR: tree not clean — commit first"; exit 1
 }
 
+export VERSION="$VER"
 ./Scripts/bundle.sh release
 ./Scripts/make-dmg.sh "$VER"
 if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -20,6 +21,8 @@ else
   git tag -a "$TAG" -m "0B77 $VER"
   echo "tagged $TAG"
 fi
+./Scripts/release-notes.sh "$VER" >/dev/null 2>&1 \
+  || echo "NOTE: no CHANGELOG section for $VER — release will use generated notes"
 
 if command -v gh >/dev/null 2>&1; then
   git push origin main "$TAG"

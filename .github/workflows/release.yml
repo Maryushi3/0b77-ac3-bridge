@@ -1,0 +1,46 @@
+name: release
+# Control: ONLY strict vX.Y.Z tags release. Branch pushes never do.
+# Push commits freely; nothing ships until you `git push origin v0.3.0`.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict tag gate (vX.Y.Z or fail)
+        run: |
+          [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+            || { echo "ref ${GITHUB_REF_NAME} is not vX.Y.Z — refusing to release"; exit 1; }
+          echo "VER=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: Bundle + DMG
+        run: |
+          export VERSION="$VER"
+          ./Scripts/bundle.sh release
+          ./Scripts/make-dmg.sh "$VER"
+      - name: "Notes from CHANGELOG (fallback: generated)"
+        id: notes
+        run: |
+          BODY="$(Scripts/release-notes.sh "$VER" || true)"
+          if [ -z "$BODY" ]; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+            printf '%s\n' "$BODY" > /tmp/notes.md
+          fi
+      - name: Publish (CHANGELOG notes)
+        if: steps.notes.outputs.missing == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: 0B77-*-macOS-arm64.dmg
+          body_path: /tmp/notes.md
+      - name: Publish (generated notes fallback)
+        if: steps.notes.outputs.missing == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: 0B77-*-macOS-arm64.dmg
+          generate_release_notes: true

@@ -1,0 +1,22 @@
+name: build
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build -c release
+      - name: Bundle + DMG (smoke)
+        run: |
+          export VERSION="0.0.0-ci"
+          ./Scripts/bundle.sh release
+          ./Scripts/make-dmg.sh "0.0.0-ci"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 0B77-ci
+          path: 0B77-*-macOS-arm64.dmg
