@@ -37,6 +37,11 @@ Settings persist in UserDefaults (bundle id `moe.mary.0b77`).
   — only warnings. The 18i20 keeps serving speakers (1–2) and system sounds.
 - **Unsigned distribution.** Ad-hoc signature, no notarization, no paid
   account — hence LaunchAgents instead of `SMAppService` for login items.
+- **Update check, not auto-update.** The app polls the GitHub latest-release
+  endpoint and offers a download link; installs stay manual. Full auto-update
+  (Sparkle-style) is pointless unsigned: every replaced bundle re-triggers
+  the Gatekeeper Right-click dance anyway, so "seamless" is unachievable
+  without a paid account. Revisit only then.
 
 ## Build & release
 
