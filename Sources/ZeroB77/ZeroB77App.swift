@@ -3,7 +3,7 @@ import CoreAudio
 import SwiftUI
 
 @main
-struct AC3BridgeApp: App {
+struct ZeroB77App: App {
     @StateObject private var settings = BridgeSettings()
     @StateObject private var controller = BridgeController()
 

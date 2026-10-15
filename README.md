@@ -56,7 +56,6 @@ instead of a driver project.
 ## Build & run
 
 ```sh
-cd native
 swift build                    # CLI sanity check
 ./Scripts/bundle.sh release    # builds 0B77.app, ad-hoc signed
 open 0B77.app                  # Right-click → Open on first launch (unsigned)
@@ -73,15 +72,14 @@ BlackHole 6ch → CoreAudio HAL IOProc → ffmpeg (s16le → ac3 → spdif)
             → HAL IOProc → output ch N/N+1, everything else silence
 ```
 
-- `native/Sources/AC3Bridge/` — SwiftPM package (no Xcode project needed):
-  `AC3BridgeApp.swift` (MenuBarExtra UI + controller), `AudioBridge.swift`
+- `Sources/ZeroB77/` — SwiftPM package (no Xcode project needed):
+  `ZeroB77App.swift` (MenuBarExtra UI + controller), `AudioBridge.swift`
   (HAL input/output, frame queue mirroring the prototype's prefill/drop
   logic), `EncoderProcess.swift` (ffmpeg child), `DeviceManager.swift`
   (CoreAudio enumeration), `BridgeSettings.swift` (UserDefaults),
   `L10n.swift` (all PL/EN strings, in code).
-- Settings persist in UserDefaults; the old Python prototype used
-  `~/.ac3bridge.json` (`git tag prototype-tk`, `ac3bridge.py` + `run.sh`
-  still in tree for reference).
+- Settings persist in UserDefaults; the original Python prototype
+  (`ac3bridge.py` + `run.sh`) lives on only in git history (`prototype-tk` tag).
 
 ## Safeguards (shared-device use)
 

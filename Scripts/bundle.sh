@@ -13,12 +13,12 @@ swift build -c "$CFG"
 
 # Fresh .app skeleton
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-BIN="$BUILD/AC3Bridge"
+BIN="$BUILD/0B77"
 if [ ! -f "$BIN" ]; then
   # SwiftPM names binary dir differently on some toolchains; find it.
-  BIN="$(find .build -name AC3Bridge -type f -path "*$CFG*" | head -1)"
+  BIN="$(find .build -name 0B77 -type f -path "*$CFG*" | head -1)"
 fi
 cp "$BIN" "$APP/Contents/MacOS/0B77"
 chmod +x "$APP/Contents/MacOS/0B77"
@@ -30,16 +30,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>0B77</string>
-  <key>CFBundleIdentifier</key><string>com.local.0b77</string>
+  <key>CFBundleIdentifier</key><string>moe.mary.0b77</string>
   <key>CFBundleName</key><string>0B77</string>
   <key>CFBundleDisplayName</key><string>0B77</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSUIElement</key><true/>
+  <key>CFBundleIconFile</key><string>0B77</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
-  <key>NSMicrophoneUsageDescription</key><string>AC3Bridge captures 6-channel audio from the virtual input device (e.g. BlackHole) to encode it to AC-3. macOS requires microphone permission for any audio capture, including virtual devices.</string>
+  <key>NSMicrophoneUsageDescription</key><string>0B77 captures 6-channel audio from the virtual input device (e.g. BlackHole) to encode it to AC-3. macOS requires microphone permission for any audio capture, including virtual devices.</string>
 </dict>
 </plist>
 PLIST

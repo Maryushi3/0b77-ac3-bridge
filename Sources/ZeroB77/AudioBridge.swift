@@ -96,10 +96,10 @@ final class AudioBridge: @unchecked Sendable {
         let inRate = DeviceManager.nominalSampleRate(inDevice)
         let outRate = DeviceManager.nominalSampleRate(outDevice)
         if inRate != 0, abs(inRate - Self.sampleRate) > 1 {
-            NSLog("AC3Bridge: input device at %.0f Hz, want 48000 (set in Audio MIDI Setup)", inRate)
+            NSLog("0B77: input device at %.0f Hz, want 48000 (set in Audio MIDI Setup)", inRate)
         }
         if outRate != 0, abs(outRate - Self.sampleRate) > 1 {
-            NSLog("AC3Bridge: output device at %.0f Hz, want 48000 (set in Audio MIDI Setup)", outRate)
+            NSLog("0B77: output device at %.0f Hz, want 48000 (set in Audio MIDI Setup)", outRate)
         }
 
         // Pump threads.
@@ -116,7 +116,7 @@ final class AudioBridge: @unchecked Sendable {
             })
         guard status == noErr, let inID else {
             stop()
-            throw NSError(domain: "AC3Bridge", code: 2,
+            throw NSError(domain: "0B77", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "Could not attach to input device (OSStatus \(status))"])
         }
         inProcID = inID
@@ -130,7 +130,7 @@ final class AudioBridge: @unchecked Sendable {
             })
         guard status == noErr, let outID else {
             stop()
-            throw NSError(domain: "AC3Bridge", code: 3,
+            throw NSError(domain: "0B77", code: 3,
                           userInfo: [NSLocalizedDescriptionKey: "Could not attach to output device (OSStatus \(status))"])
         }
         outProcID = outID
@@ -138,13 +138,13 @@ final class AudioBridge: @unchecked Sendable {
         status = AudioDeviceStart(inDevice, inProcID)
         guard status == noErr else {
             stop()
-            throw NSError(domain: "AC3Bridge", code: 4,
+            throw NSError(domain: "0B77", code: 4,
                           userInfo: [NSLocalizedDescriptionKey: "Could not start input device (OSStatus \(status))"])
         }
         status = AudioDeviceStart(outDevice, outProcID)
         if status != noErr {
             stop()
-            throw NSError(domain: "AC3Bridge", code: 5,
+            throw NSError(domain: "0B77", code: 5,
                           userInfo: [NSLocalizedDescriptionKey: "Could not start output device (OSStatus \(status)). Is the sample rate 48 kHz?"])
         }
     }
@@ -410,7 +410,7 @@ final class AudioBridge: @unchecked Sendable {
         }
         if !warnedFormat, !isFloat, bytesPerSample != 2 {
             warnedFormat = true
-            NSLog("AC3Bridge: output format %u-bit (float=%d); bit-exact SPDIF wants s16 — check Audio MIDI Setup",
+            NSLog("0B77: output format %u-bit (float=%d); bit-exact SPDIF wants s16 — check Audio MIDI Setup",
                   fmt.mBitsPerChannel, isFloat)
         }
     }

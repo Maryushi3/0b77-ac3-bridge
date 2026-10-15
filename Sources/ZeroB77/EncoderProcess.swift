@@ -3,7 +3,7 @@ import Foundation
 /// ffmpeg sidecar: bundled Contents/MacOS/ffmpeg first, then PATH / Homebrew.
 enum FFmpegLocator {
     static func find() -> String? {
-        // 1. Bundled next to our executable (AC3Bridge.app/Contents/MacOS/ffmpeg)
+        // 1. Bundled next to our executable (0B77.app/Contents/MacOS/ffmpeg)
         let bundled = Bundle.main.bundlePath + "/Contents/MacOS/ffmpeg"
         if FileManager.default.isExecutableFile(atPath: bundled) { return bundled }
         // Also handle swift-build dev layout (native/.build/.../ffmpeg copied by bundle.sh)
@@ -52,7 +52,7 @@ final class EncoderProcess: @unchecked Sendable {
 
     func start() throws {
         guard let ff = FFmpegLocator.find() else {
-            throw NSError(domain: "AC3Bridge", code: 1,
+            throw NSError(domain: "0B77", code: 1,
                           userInfo: [NSLocalizedDescriptionKey:
                               "ffmpeg not found. Install via: brew install ffmpeg"])
         }
