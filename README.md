@@ -75,6 +75,22 @@ open 0B77.app                  # Right-click → Open on first launch (unsigned)
 No paid Apple Developer account is used: ad-hoc signature, no notarization.
 Receivers drag to /Applications and Right-click → Open once.
 
+## Start at login
+
+No paid signing means no `SMAppService` — the classic plist does the job:
+
+```sh
+cp -R 0B77.app /Applications/
+./Scripts/install-login-item.sh              # uses /Applications/0B77.app
+./Scripts/install-login-item.sh --uninstall  # remove again
+```
+
+This writes `~/Library/LaunchAgents/moe.mary.0b77.plist` and registers it for
+your login session. The app launches at login but does **not** auto-start the
+bridge — devices may not be up yet, and streaming onto a changed layout is
+exactly what the watchdog guards against. Logs land in
+`~/Library/Logs/0B77.{out,err}.log`.
+
 ## How it works
 
 ```
