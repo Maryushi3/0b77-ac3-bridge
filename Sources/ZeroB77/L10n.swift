@@ -10,40 +10,37 @@ struct T {
 
     // App chrome
     var appName: String { "0B77" }
-    var appSubtitle: String { pl ? "mostek AC-3" : "AC-3 bridge" }
-    var languageLabel: String { pl ? "język" : "language" }
-    var languageSystem: String { pl ? "systemowy" : "system" }
+    var appSubtitle: String { pl ? "Mostek AC-3" : "AC-3 bridge" }
+    var languageLabel: String { pl ? "Język" : "Language" }
+    var languageSystem: String { pl ? "Systemowy" : "System" }
 
     // Device pickers
-    var inputLabel: String { pl ? "wejście (6 kan.)" : "input (6ch)" }
-    var outputLabel: String { pl ? "wyjście" : "output" }
+    var inputLabel: String { pl ? "Wejście (6 kan.)" : "Input (6ch)" }
+    var outputLabel: String { pl ? "Wyjście" : "Output" }
     func channelsIn(_ n: Int) -> String { pl ? "\(n) wej." : "\(n) in" }
     func channelsOut(_ n: Int) -> String { pl ? "\(n) wyj." : "\(n) out" }
 
     // Settings
-    func firstChannel(_ ch: Int) -> String {
-        pl ? "pierwszy kanał wyjścia: \(ch) (używa \(ch)–\(ch + 1))"
-            : "first output channel: \(ch) (uses \(ch)–\(ch + 1))"
-    }
-    var bitrateLabel: String { pl ? "przepływność AC-3" : "AC-3 bitrate" }
+    var firstChannelLabel: String { pl ? "Pierwszy kanał wyjścia" : "First output channel" }
+    func channelPair(_ ch: Int) -> String { "\(ch)–\(ch + 1)" }
+    var bitrateLabel: String { pl ? "Przepływność AC-3" : "AC-3 bitrate" }
     func bitrateUnit(_ b: Int) -> String { pl ? "\(b) kb/s" : "\(b) kbps" }
-    func buffer(_ n: Int) -> String {
-        pl ? "bufor: \(n) (~\(n * 32) ms)" : "buffer: \(n) (~\(n * 32) ms)"
-    }
+    var bufferLabel: String { pl ? "Bufor" : "Buffer" }
+    func bufferRow(_ n: Int) -> String { "\(n) (~\(n * 32) ms)" }
 
     // Buttons
-    var start: String { "start" }
-    var stop: String { "stop" }
+    var start: String { "Start" }
+    var stop: String { "Stop" }
     var confirmSpeakers: String { pl ? "Potwierdź: start na 1–2" : "Confirm: start on 1–2" }
     var refresh: String { pl ? "Odśwież urządzenia" : "Refresh devices" }
-    var quit: String { pl ? "zakończ" : "quit" }
+    var quit: String { pl ? "Zakończ" : "Quit" }
 
     // Status
-    var stopped: String { pl ? "zatrzymano" : "stopped" }
+    var stopped: String { pl ? "Zatrzymano" : "Stopped" }
     var streaming: String { pl ? "transmisja" : "streaming" }
     var buffering: String { pl ? "buforowanie" : "buffering" }
     func running(_ mode: String, fill: Int, max: Int, drops: Int, underruns: Int, peak: String, e2e: String) -> String {
-        pl ? "działa (\(mode)) | bufor \(fill)/\(max) ramek | odrzucone \(drops) | underruny \(underruns) | \(peak) | \(e2e)"
+        pl ? "Działa (\(mode)) | bufor \(fill)/\(max) ramek | odrzucone \(drops) | underruny \(underruns) | \(peak) | \(e2e)"
             : "Running (\(mode)) | buffer \(fill)/\(max) frames | dropped \(drops) | underruns \(underruns) | \(peak) | \(e2e)"
     }
     var inputSilent: String { pl ? "wej. cisza" : "in silent" }
@@ -86,8 +83,8 @@ struct T {
             : "Output device only has \(n) channels."
     }
     var speakerConfirm: String {
-        pl ? "Kanały 1–2 to głośniki — zakodowany AC-3 to hałas o pełnej skali. Naciśnij start ponownie, aby potwierdzić."
-            : "Channels 1–2 feed your speakers — encoded AC-3 there is full-scale noise. Press start again to confirm."
+        pl ? "Kanały 1–2 to głośniki — zakodowany AC-3 to hałas o pełnej skali. Naciśnij Start ponownie, aby potwierdzić."
+            : "Channels 1–2 feed your speakers — encoded AC-3 there is full-scale noise. Press Start again to confirm."
     }
     func couldNotStart(_ e: String) -> String { pl ? "Nie można uruchomić:\n\(e)" : "Could not start:\n\(e)" }
     var ffmpegExited: String { pl ? "ffmpeg zakończył działanie" : "ffmpeg exited" }

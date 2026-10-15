@@ -328,11 +328,16 @@ struct PopoverView: View {
             .pickerStyle(.menu)
             .disabled(controller.isRunning)
 
-            HStack {
-                Stepper(t.firstChannel(settings.firstChannel),
-                        value: $settings.firstChannel, in: 1...63)
+            Picker(t.firstChannelLabel, selection: $settings.firstChannel) {
+                ForEach(channelRange, id: \.self) { ch in
+                    Text(t.channelPair(ch)).tag(ch)
+                }
             }
+            .pickerStyle(.menu)
             .disabled(controller.isRunning)
+            .onChange(of: controller.selectedOutputID) { _, _ in
+                clampChannel(settings: settings)
+            }
 
             HStack {
                 Picker(t.bitrateLabel, selection: $settings.bitrate) {
@@ -342,9 +347,13 @@ struct PopoverView: View {
                 }
                 .pickerStyle(.menu)
                 .disabled(controller.isRunning)
-                Stepper(t.buffer(settings.prefill),
-                        value: $settings.prefill, in: 1...8)
-                    .onChange(of: settings.prefill) { _, n in controller.applyPrefill(n) }
+                Picker(t.bufferLabel, selection: $settings.prefill) {
+                    ForEach(1...8, id: \.self) { n in
+                        Text(t.bufferRow(n)).tag(n)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onChange(of: settings.prefill) { _, n in controller.applyPrefill(n) }
             }
 
             HStack {
@@ -374,8 +383,22 @@ struct PopoverView: View {
         .onAppear {
             controller.uiPolish = settings.usePolish
             controller.restoreSelection(settings: settings)
+            clampChannel(settings: settings)
         }
         .onChange(of: settings.language) { _, _ in controller.uiPolish = settings.usePolish }
+    }
+
+    private var channelRange: Range<Int> {
+        let outs = controller.outputDevices.first(
+            where: { $0.id == controller.selectedOutputID })?.outputChannels ?? 20
+        return 1..<(min(64, max(2, outs)))
+    }
+
+    /// Keep the saved pair valid when the output device changes.
+    private func clampChannel(settings: BridgeSettings) {
+        if !channelRange.contains(settings.firstChannel) {
+            settings.firstChannel = channelRange.lowerBound
+        }
     }
 
     private func deviceBinding(devices _: [AudioDeviceInfo],
