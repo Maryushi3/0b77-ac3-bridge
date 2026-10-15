@@ -39,9 +39,9 @@ struct T {
     var stopped: String { pl ? "Zatrzymano" : "Stopped" }
     var streaming: String { pl ? "transmisja" : "streaming" }
     var buffering: String { pl ? "buforowanie" : "buffering" }
-    func running(_ mode: String, fill: Int, max: Int, drops: Int, underruns: Int, peak: String, e2e: String) -> String {
-        pl ? "Działa (\(mode)) | bufor \(fill)/\(max) ramek | odrzucone \(drops) | underruny \(underruns) | \(peak) | \(e2e)"
-            : "Running (\(mode)) | buffer \(fill)/\(max) frames | dropped \(drops) | underruns \(underruns) | \(peak) | \(e2e)"
+    func running(_ mode: String, fill: Int, max: Int, drops: Int, underruns: Int, peak: String) -> String {
+        pl ? "Działa (\(mode)) | bufor \(fill)/\(max) ramek | odrzucone \(drops) | underruny \(underruns) | \(peak)"
+            : "Running (\(mode)) | buffer \(fill)/\(max) frames | dropped \(drops) | underruns \(underruns) | \(peak)"
     }
     var inputSilent: String { pl ? "wej. cisza" : "in silent" }
     func inputPeak(_ db: Int) -> String { pl ? "szczyt wej. \(db) dBFS" : "in peak \(db) dBFS" }

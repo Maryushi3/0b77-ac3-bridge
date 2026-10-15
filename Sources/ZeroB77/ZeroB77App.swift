@@ -256,9 +256,7 @@ final class BridgeController: ObservableObject {
         } else {
             peak = t.inputPeak(Int((20 * log10(s.inPeak)).rounded()))
         }
-        let e2e = s.latAvgMs < 0 ? "e2e …"
-            : String(format: "e2e ~%.0fms (max %.0f)", s.latAvgMs, s.latMaxMs)
-        statusLine = t.running(mode, fill: s.fill, max: s.maxBuf, drops: s.drops, underruns: s.underruns, peak: peak, e2e: e2e)
+        statusLine = t.running(mode, fill: s.fill, max: s.maxBuf, drops: s.drops, underruns: s.underruns, peak: peak)
     }
 }
 

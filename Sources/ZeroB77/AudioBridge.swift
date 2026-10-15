@@ -28,13 +28,7 @@ final class AudioBridge: @unchecked Sendable {
     private var _inPeak: Float = 0 // max |sample| on input since last stats read
 
     private let inCond = NSCondition()
-    private var _inQueue: [(data: Data, frames: Int)] = [] // raw 6ch s16le chunks for ffmpeg stdin
-    // FIFO of (input frames, device host-time ns) feeding the latency measure:
-    // 1536 input frames become exactly one IEC frame out of the encoder.
-    private var _inFrames: [(frames: Int, atNs: UInt64)] = []
-    private var _latSumMs = 0.0
-    private var _latCount = 0
-    private var _latMaxMs = 0.0
+    private var _inQueue: [Data] = []      // raw 6ch s16le chunks for ffmpeg stdin
 
     private var _running = false
     private var encoder: EncoderProcess?
@@ -53,19 +47,13 @@ final class AudioBridge: @unchecked Sendable {
         let playing: Bool
         /// 0…1 input peak over the last window (stuck at 0 = silence — check mic permission).
         let inPeak: Float
-        /// Input-device → encoder-out latency over the last window, ms.
-        let latAvgMs: Double
-        let latMaxMs: Double
     }
 
     var stats: Stats {
         lock.lock()
-        let avg = _latCount > 0 ? _latSumMs / Double(_latCount) : -1
         let s = Stats(fill: _buf.count, maxBuf: maxBuf, drops: _drops,
-                      underruns: _underruns, playing: _playing, inPeak: _inPeak,
-                      latAvgMs: avg, latMaxMs: _latMaxMs)
+                      underruns: _underruns, playing: _playing, inPeak: _inPeak)
         _inPeak = 0
-        _latSumMs = 0; _latCount = 0; _latMaxMs = 0
         lock.unlock()
         return s
     }
@@ -96,16 +84,13 @@ final class AudioBridge: @unchecked Sendable {
         _running = true
         _buf.removeAll(); _cur = nil; _pos = 0; _playing = false
         _drops = 0; _underruns = 0; _inPeak = 0
-        _latSumMs = 0; _latCount = 0; _latMaxMs = 0
         lock.unlock()
-        inCond.lock(); _inQueue.removeAll(); _inFrames.removeAll(); inCond.unlock()
+        inCond.lock(); _inQueue.removeAll(); inCond.unlock()
         encoder = enc
 
         inFormat = Self.streamFormat(of: inDevice, scope: kAudioDevicePropertyScopeInput)
         outFormat = Self.streamFormat(of: outDevice, scope: kAudioDevicePropertyScopeOutput)
         outChannels = max(2, Int(outFormat.mChannelsPerFrame))
-        Self.logDeviceTiming(inDevice, label: "input")
-        Self.logDeviceTiming(outDevice, label: "output")
 
         // Warn when devices aren't at 48 kHz (user fixes in Audio MIDI Setup, same as before).
         let inRate = DeviceManager.nominalSampleRate(inDevice)
@@ -126,8 +111,8 @@ final class AudioBridge: @unchecked Sendable {
         var inID: AudioDeviceIOProcID?
         var status = AudioDeviceCreateIOProcIDWithBlock(
             &inID, inDevice, DispatchQueue.global(qos: .userInitiated),
-            { [weak self] _, inData, inNow, _, _ in
-                self?.handleInput(inData, hostTime: inNow.pointee.mHostTime)
+            { [weak self] _, inData, _, _, _ in
+                self?.handleInput(inData)
             })
         guard status == noErr, let inID else {
             stop()
@@ -194,7 +179,7 @@ final class AudioBridge: @unchecked Sendable {
             while _inQueue.isEmpty, isRunningUnsafeForCond() {
                 inCond.wait(until: Date(timeIntervalSinceNow: 0.2))
             }
-            let data: Data? = _inQueue.isEmpty ? nil : _inQueue.removeFirst().data
+            let data: Data? = _inQueue.isEmpty ? nil : _inQueue.removeFirst()
             inCond.unlock()
             guard let data, let stdinHandle = encoder?.stdinHandle else { continue }
             do { try stdinHandle.write(contentsOf: data) } catch { break }
@@ -212,27 +197,6 @@ final class AudioBridge: @unchecked Sendable {
             guard let stdoutHandle = encoder?.stdoutHandle else { break }
             let data = stdoutHandle.readData(ofLength: Self.frameBytes)
             if data.count < Self.frameBytes { break }  // ffmpeg exited
-            // Attribute this frame to the oldest 1536 input frames (FIFO):
-            // now minus their device time == input→encoder latency.
-            let nowNs = AudioConvertHostTimeToNanos(AudioGetCurrentHostTime())
-            var need = 1536
-            var oldestNs: UInt64 = 0
-            inCond.lock()
-            while need > 0, !_inFrames.isEmpty {
-                if oldestNs == 0 { oldestNs = _inFrames[0].atNs }
-                let take = min(need, _inFrames[0].frames)
-                _inFrames[0].frames -= take
-                need -= take
-                if _inFrames[0].frames == 0 { _inFrames.removeFirst() }
-            }
-            inCond.unlock()
-            if oldestNs != 0 {
-                let ms = Double(nowNs >= oldestNs ? nowNs - oldestNs : 0) / 1_000_000
-                lock.lock()
-                _latSumMs += ms; _latCount += 1
-                if ms > _latMaxMs { _latMaxMs = ms }
-                lock.unlock()
-            }
             lock.lock()
             _buf.append(data)
             while _buf.count > maxBuf {
@@ -245,11 +209,9 @@ final class AudioBridge: @unchecked Sendable {
 
     // MARK: - IOProcs
 
-    private func handleInput(_ ablPtr: UnsafePointer<AudioBufferList>, hostTime: UInt64) {
+    private func handleInput(_ ablPtr: UnsafePointer<AudioBufferList>) {
         let s16 = convertInputToS16LE(ablPtr)
         guard !s16.isEmpty else { return }
-        let atNs = hostTime != 0 ? AudioConvertHostTimeToNanos(hostTime)
-            : AudioConvertHostTimeToNanos(AudioGetCurrentHostTime())
         // Input peak meter (also doubles as a capture-health signal).
         var peak: Float = 0
         s16.withUnsafeBytes { (p: UnsafeRawBufferPointer) in
@@ -263,18 +225,8 @@ final class AudioBridge: @unchecked Sendable {
         if peak > _inPeak { _inPeak = peak }
         lock.unlock()
         inCond.lock()
-        _inQueue.append((data: s16, frames: s16.count / 12))
-        _inFrames.append((frames: s16.count / 12, atNs: atNs))
-        if _inQueue.count > 200 {  // ffmpeg stalled: drop chunk + its frame debt
-            let dropped = _inQueue.removeFirst().frames
-            var drop = dropped
-            while drop > 0, !_inFrames.isEmpty {
-                let take = min(drop, _inFrames[0].frames)
-                _inFrames[0].frames -= take
-                drop -= take
-                if _inFrames[0].frames == 0 { _inFrames.removeFirst() }
-            }
-        }
+        _inQueue.append(s16)
+        if _inQueue.count > 200 { _inQueue.removeFirst() }  // ffmpeg stalled
         inCond.signal()
         inCond.unlock()
     }
@@ -328,34 +280,6 @@ final class AudioBridge: @unchecked Sendable {
     }
 
     // MARK: - format helpers
-
-    private static func uintProperty(_ device: AudioDeviceID,
-                                     selector: AudioObjectPropertySelector,
-                                     scope: AudioObjectPropertyScope) -> UInt32 {
-        var addr = AudioObjectPropertyAddress(
-            mSelector: selector,
-            mScope: scope,
-            mElement: kAudioObjectPropertyElementMain)
-        var v: UInt32 = 0
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(device, &addr, 0, nil, &size, &v) == noErr else { return 0 }
-        return v
-    }
-
-    /// One-line HAL budget for the latency investigation: buffer + latencies in ms.
-    private static func logDeviceTiming(_ device: AudioDeviceID, label: String) {
-        let buf = uintProperty(device, selector: kAudioDevicePropertyBufferFrameSize,
-                               scope: kAudioObjectPropertyScopeGlobal)
-        let inLat = uintProperty(device, selector: kAudioDevicePropertyLatency,
-                                 scope: kAudioDevicePropertyScopeInput)
-        let outLat = uintProperty(device, selector: kAudioDevicePropertyLatency,
-                                  scope: kAudioDevicePropertyScopeOutput)
-        let safety = uintProperty(device, selector: kAudioDevicePropertySafetyOffset,
-                                  scope: kAudioObjectPropertyScopeGlobal)
-        let ms = { (f: UInt32) in Double(f) / sampleRate * 1000 }
-        NSLog("0B77: %@ device buffer %u frames (%.1f ms), latency in/out %u/%u, safety %u frames",
-              label as NSString, buf, ms(buf), inLat, outLat, safety)
-    }
 
     private static func streamFormat(of device: AudioDeviceID,
                                      scope: AudioObjectPropertyScope) -> AudioStreamBasicDescription {
