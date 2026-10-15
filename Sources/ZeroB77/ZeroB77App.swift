@@ -370,9 +370,13 @@ struct PopoverView: View {
             Text(controller.statusLine)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(3)
+                .lineLimit(5)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if let err = controller.lastError {
                 Text(err).font(.caption).foregroundStyle(.red).lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             Button(t.quit) { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.link)

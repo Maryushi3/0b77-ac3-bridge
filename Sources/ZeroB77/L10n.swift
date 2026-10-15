@@ -40,8 +40,8 @@ struct T {
     var streaming: String { pl ? "transmisja" : "streaming" }
     var buffering: String { pl ? "buforowanie" : "buffering" }
     func running(_ mode: String, fill: Int, max: Int, drops: Int, underruns: Int, peak: String) -> String {
-        pl ? "Działa (\(mode)) | bufor \(fill)/\(max) ramek | odrzucone \(drops) | underruny \(underruns) | \(peak)"
-            : "Running (\(mode)) | buffer \(fill)/\(max) frames | dropped \(drops) | underruns \(underruns) | \(peak)"
+        pl ? "Działa (\(mode))\nbufor \(fill)/\(max) ramek\nodrzucone \(drops) | underruny \(underruns)\n\(peak)"
+            : "Running (\(mode))\nbuffer \(fill)/\(max) frames\ndropped \(drops) | underruns \(underruns)\n\(peak)"
     }
     var inputSilent: String { pl ? "wej. cisza" : "in silent" }
     func inputPeak(_ db: Int) -> String { pl ? "szczyt wej. \(db) dBFS" : "in peak \(db) dBFS" }
