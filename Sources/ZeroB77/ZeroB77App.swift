@@ -380,6 +380,16 @@ struct PopoverView: View {
             }
             Button(t.quit) { NSApplication.shared.terminate(nil) }
                 .buttonStyle(.link)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(t.madeBy).font(.caption2).foregroundStyle(.tertiary)
+                Button(t.repoLabel) {
+                    if let url = URL(string: t.repoURL) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .buttonStyle(.link)
+                .font(.caption2)
+            }
         }
         .padding(12)
         .onAppear {

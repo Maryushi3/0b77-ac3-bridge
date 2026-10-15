@@ -26,8 +26,15 @@ One-time setup in Audio MIDI Setup:
 
 ## Install
 
-Drag `0B77.app` to /Applications, Right-click → Open once (unsigned build),
-then optionally start it at login:
+```sh
+./Scripts/install.sh   # copies to /Applications, clears quarantine
+```
+
+This also strips the download quarantine flag, so Gatekeeper stops demanding
+Right-click → Open on every update. (Unsigned builds get quarantined on
+download; clearing the flag once per install is the whole trick.)
+
+Made by Mary, with help of Meta Spark 1.3.
 
 ```sh
 ./Scripts/install-login-item.sh              # uses /Applications/0B77.app
