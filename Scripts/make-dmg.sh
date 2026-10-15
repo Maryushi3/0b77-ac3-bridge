@@ -28,8 +28,9 @@ hdiutil create -srcfolder "$STAGE" -volname "$VOL" -fs HFS+ -format UDRW "$RW" >
 MNT="/Volumes/$VOL"
 hdiutil attach -readwrite -noverify -noautoopen "$RW" >/dev/null
 
-if osascript <<OSA 2>/dev/null; then
+if osascript <<OSA 2>"$STAGE/osascript.err"; then
 tell application "Finder"
+  set bgFile to file ".background:background.png" of disk "$VOL"
   tell disk "$VOL"
     open
     set current view of container window to icon view
@@ -39,7 +40,7 @@ tell application "Finder"
     tell icon view options of container window
       set arrangement to not arranged
       set icon size to 128
-      set background picture to file ".background:background.png"
+      set background picture to bgFile
     end tell
     set position of item "0B77.app" to {150, 250}
     set position of item "Applications" to {510, 250}
@@ -54,6 +55,7 @@ OSA
   echo "layout applied"
 else
   echo "WARNING: Finder layout failed — shipping functional DMG without arrangement"
+  cat "$STAGE/osascript.err" 2>/dev/null || true
 fi
 
 hdiutil detach "$MNT" >/dev/null

@@ -5,6 +5,11 @@ you cut the release; if it's missing, GitHub auto-generates notes instead.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-15
+
+- Fix DMG background (path was relative to the startup disk, so Finder
+  silently skipped the whole layout); layout errors are now logged
+
 ## [0.1.1] - 2026-10-15
 
 - Drag-and-drop DMG installer (background art, Applications shortcut)
