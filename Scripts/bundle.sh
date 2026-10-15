@@ -45,6 +45,22 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+# Icon: .iconset from the committed master, then .icns into Resources.
+MASTER="Assets/0B77-master.png"
+if [ -f "$MASTER" ] && command -v iconutil >/dev/null 2>&1; then
+  rm -rf 0B77.iconset
+  mkdir 0B77.iconset
+  for sz in 16 32 128 256 512; do
+    sips -z "$sz" "$sz" "$MASTER" --out "0B77.iconset/icon_${sz}x${sz}.png" >/dev/null
+    sips -z "$((sz * 2))" "$((sz * 2))" "$MASTER" --out "0B77.iconset/icon_${sz}x${sz}@2x.png" >/dev/null
+  done
+  iconutil -c icns 0B77.iconset -o "$APP/Contents/Resources/0B77.icns"
+  rm -rf 0B77.iconset
+  echo "icon: $APP/Contents/Resources/0B77.icns"
+else
+  echo "WARNING: no icon master or iconutil — app ships without icon."
+fi
+
 # ffmpeg sidecar: NOT bundled — receivers `brew install ffmpeg`.
 # The app looks up ffmpeg at runtime (bundled path skipped, then
 # /opt/homebrew/bin, /usr/local/bin, PATH). Fail-fast with install hint.

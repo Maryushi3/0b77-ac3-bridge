@@ -1,3 +1,4 @@
+import AppKit
 import AVFoundation
 import CoreAudio
 import SwiftUI
@@ -14,8 +15,7 @@ struct ZeroB77App: App {
                 .environmentObject(controller)
                 .frame(width: 380)
         } label: {
-            Label(controller.isRunning ? "0B77 ●" : "0B77",
-                  systemImage: controller.isRunning ? "waveform" : "cable.connector.horizontal")
+            Label { Text("0B77") } icon: { Image(nsImage: controller.menuImage) }
         }
     }
 }
@@ -37,6 +37,8 @@ final class BridgeController: ObservableObject {
     @Published var runSummary = ""
     /// Mirrors BridgeSettings.usePolish (synced by the view); drives all controller strings.
     @Published var uiPolish = false
+    /// Menu-bar grid state; the icon itself shows idle vs streaming.
+    @Published var menuImage: NSImage = MenuIcon.image(streaming: false)
 
     private var bridge: AudioBridge?
     private var timer: Timer?
@@ -164,6 +166,7 @@ final class BridgeController: ObservableObject {
         }
         bridge = b
         isRunning = true
+        menuImage = MenuIcon.image(streaming: true)
         runSummary = t.runSummary(inName: inDev.name, outName: outDev.name,
                                   ch: settings.firstChannel, bitrate: settings.bitrate)
         watchInID = inID
@@ -178,6 +181,7 @@ final class BridgeController: ObservableObject {
         bridge?.stop()
         bridge = nil
         isRunning = false
+        menuImage = MenuIcon.image(streaming: false)
         statusLine = T(pl: uiPolish).stopped
         runSummary = ""
         speakerConfirmPending = false
