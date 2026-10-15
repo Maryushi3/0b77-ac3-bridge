@@ -38,9 +38,11 @@ jobs:
         with:
           files: 0B77-*-macOS-arm64.dmg
           body_path: /tmp/notes.md
+          name: ${{ github.ref_name == 'v0.1.0' && '0B77 0.1.0 — first public release' || github.ref_name }}
       - name: Publish (generated notes fallback)
         if: steps.notes.outputs.missing == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: 0B77-*-macOS-arm64.dmg
           generate_release_notes: true
+          name: ${{ github.ref_name == 'v0.1.0' && '0B77 0.1.0 — first public release' || github.ref_name }}

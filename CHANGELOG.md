@@ -5,7 +5,7 @@ you cut the release; if it's missing, GitHub auto-generates notes instead.
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-15
+## [0.1.0] - 2026-10-15 - first public release
 
 First native release. Menu-bar app replacing the Python prototype:
 

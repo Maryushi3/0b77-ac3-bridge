@@ -53,7 +53,7 @@ Safety rules the app enforces:
 
 ## No sound?
 
-- Status shows `wej. cisza` / `in silent` → input is silent. Grant the
+- Status reports silent input (`in silent`) → nothing is being captured. Grant the
   microphone permission and play something into BlackHole.
 - Receiver doesn't lock onto the stream → both devices must actually run at
   48 kHz (check Audio MIDI Setup, not just the app's warnings).
