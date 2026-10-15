@@ -126,5 +126,4 @@ Guarding against *something else* playing on 9–10 is the operator's job.
 
 Working: menubar app, streaming verified on-device (receiver locks, sound ok).
 Ideas parked: latency instrumentation vs the ~100 ms Python baseline,
-login-at-login via LaunchAgents, GitLab Release upload flow, static
-`libavcodec` link, Windows port (separate GUI, far future).
+static `libavcodec` link, Windows port (separate GUI, far future).
