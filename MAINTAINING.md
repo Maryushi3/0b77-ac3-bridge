@@ -35,6 +35,11 @@ Settings persist in UserDefaults (bundle id `moe.mary.0b77`).
   latency shows up in measurements.
 - **Shared output device.** No hog mode, no forced sample-rate/format changes
   — only warnings. The 18i20 keeps serving speakers (1–2) and system sounds.
+- **Static encode, subprocess fallback.** `ThirdParty/` holds minimal static
+  `libavcodec`/`libavformat`/`libavutil` (9.0.2, ac3 encoder + spdif muxer
+  only — rebuild with `Scripts/build-ffmpeg.sh`). The app encodes in-process
+  by default; `ZB77_SUBPROCESS=1` forces the old ffmpeg-child path.
+  `Scripts/golden-test.sh` proves byte-identity between the two.
 - **Unsigned distribution.** Ad-hoc signature, no notarization, no paid
   account — hence LaunchAgents instead of `SMAppService` for login items.
 - **Update check, not auto-update.** The app polls the GitHub latest-release

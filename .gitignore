@@ -3,3 +3,5 @@
 *.dmg
 tmp/
 .DS_Store
+# Local planning docs (never push)
+PLAN-*.md

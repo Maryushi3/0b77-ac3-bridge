@@ -200,6 +200,7 @@ final class BridgeController: ObservableObject {
         menuImage = MenuIcon.image(streaming: true)
         runSummary = t.runSummary(inName: inDev.name, outName: outDev.name,
                                   ch: settings.firstChannel, bitrate: settings.bitrate)
+            + " (\(b.engineName))"
         watchInID = inID
         watchOutID = outID
         watchInRate = DeviceManager.nominalSampleRate(inID)

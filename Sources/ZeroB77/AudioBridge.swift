@@ -32,6 +32,11 @@ final class AudioBridge: @unchecked Sendable {
 
     private var _running = false
     private var encoder: EncoderProcess?
+    private var staticEnc: StaticEncoder?
+    private var staticMode = false
+    private var pending = Data() // sub-unit input remainder (static path)
+    /// "static" or "subprocess" once started — shown in the run summary.
+    private(set) var engineName = "?"
     private var inProcID: AudioDeviceIOProcID?
     private var outProcID: AudioDeviceIOProcID?
     private var inFormat = AudioStreamBasicDescription()
@@ -60,7 +65,9 @@ final class AudioBridge: @unchecked Sendable {
 
     var isAlive: Bool {
         lock.lock(); let r = _running; lock.unlock()
-        guard r, let e = encoder else { return false }
+        guard r else { return false }
+        if staticMode { return staticEnc != nil }
+        guard let e = encoder else { return false }
         return e.isAlive
     }
 
@@ -78,15 +85,30 @@ final class AudioBridge: @unchecked Sendable {
     // MARK: - control
 
     func start() throws {
-        let enc = EncoderProcess(bitrate: bitrate)
-        try enc.start()
+        // Engine choice: static in-process encode by default (no pipes, no
+        // child); subprocess fallback on failure or ZB77_SUBPROCESS=1.
+        let forceSubprocess = ProcessInfo.processInfo.environment["ZB77_SUBPROCESS"] != nil
+        if !forceSubprocess, let se = try? StaticEncoder(bitrate: bitrate) {
+            staticEnc = se
+            staticMode = true
+            engineName = "static"
+        } else {
+            if !forceSubprocess {
+                NSLog("0B77: static encoder unavailable, falling back to ffmpeg child")
+            }
+            let enc = EncoderProcess(bitrate: bitrate)
+            try enc.start()
+            encoder = enc
+            staticMode = false
+            engineName = "subprocess"
+        }
         lock.lock()
         _running = true
         _buf.removeAll(); _cur = nil; _pos = 0; _playing = false
         _drops = 0; _underruns = 0; _inPeak = 0
         lock.unlock()
         inCond.lock(); _inQueue.removeAll(); inCond.unlock()
-        encoder = enc
+        pending.removeAll()
 
         inFormat = Self.streamFormat(of: inDevice, scope: kAudioDevicePropertyScopeInput)
         outFormat = Self.streamFormat(of: outDevice, scope: kAudioDevicePropertyScopeOutput)
@@ -102,9 +124,13 @@ final class AudioBridge: @unchecked Sendable {
             NSLog("0B77: output device at %.0f Hz, want 48000 (set in Audio MIDI Setup)", outRate)
         }
 
-        // Pump threads.
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.writerLoop() }
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.readerLoop() }
+        // Pump threads (static path encodes inline; subprocess path pipes).
+        if staticMode {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.staticWriterLoop() }
+        } else {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.writerLoop() }
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.readerLoop() }
+        }
 
         // Input proc: convert device frames -> interleaved 6ch s16le -> queue for ffmpeg.
         // NOTE: outIOProcID comes first in this API.
@@ -164,6 +190,8 @@ final class AudioBridge: @unchecked Sendable {
         }
         encoder?.stop()
         encoder = nil
+        staticEnc?.close()
+        staticEnc = nil
     }
 
     // MARK: - pump threads (mirror _writer / _reader in ac3bridge.py)
@@ -183,6 +211,39 @@ final class AudioBridge: @unchecked Sendable {
             inCond.unlock()
             guard let data, let stdinHandle = encoder?.stdinHandle else { continue }
             do { try stdinHandle.write(contentsOf: data) } catch { break }
+        }
+    }
+
+    /// Static path: slice input into 1536-frame units, encode inline, queue
+    /// complete IEC frames. No pipes, no reader thread.
+    private func staticWriterLoop() {
+        while isRunning() {
+            inCond.lock()
+            while _inQueue.isEmpty, isRunningUnsafeForCond() {
+                inCond.wait(until: Date(timeIntervalSinceNow: 0.2))
+            }
+            let data: Data? = _inQueue.isEmpty ? nil : _inQueue.removeFirst()
+            inCond.unlock()
+            guard let data, let se = staticEnc else { continue }
+            pending.append(data)
+            while pending.count >= StaticEncoder.pcmBytes {
+                let unit = pending.prefix(StaticEncoder.pcmBytes)
+                pending.removeFirst(StaticEncoder.pcmBytes)
+                do {
+                    if let frame = try se.encode(Data(unit)) {
+                        lock.lock()
+                        _buf.append(frame)
+                        while _buf.count > maxBuf {
+                            _buf.removeFirst()
+                            _drops += 1
+                        }
+                        lock.unlock()
+                    }
+                } catch {
+                    NSLog("0B77: static encode failed: %@", error.localizedDescription as NSString)
+                    return
+                }
+            }
         }
     }
 
