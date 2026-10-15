@@ -10,7 +10,7 @@ APP="0B77.app"
 BUILD=".build/$CFG"
 # Release version baked into the plist; CI passes VERSION=vX.Y.Z worth.
 # Local default matches the current release line.
-VER="${VERSION:-0.1.0}"
+VER="${VERSION:-0.1.1}"
 
 swift build -c "$CFG"
 

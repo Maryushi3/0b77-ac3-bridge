@@ -39,6 +39,9 @@ final class BridgeController: ObservableObject {
     @Published var uiPolish = false
     /// Menu-bar grid state; the icon itself shows idle vs streaming.
     @Published var menuImage: NSImage = MenuIcon.image(streaming: false)
+    /// Newer GitHub release tag (e.g. "0.1.1"); nil when up to date / offline.
+    @Published var updateVersion: String?
+    @Published var updateURL: String?
 
     private var bridge: AudioBridge?
     private var timer: Timer?
@@ -60,6 +63,34 @@ final class BridgeController: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
+        Task { await checkForUpdates() }
+    }
+
+    /// One-shot update check against GitHub releases. Silent on failure
+    /// (offline, no releases yet) — installs stay manual regardless.
+    private func checkForUpdates() async {
+        struct Release: Decodable { var tag_name: String; var html_url: String }
+        guard let url = URL(string: "https://api.github.com/repos/Maryushi3/0b77-ac3-bridge/releases/latest"),
+              let current = Bundle.main.object(
+                  forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let rel = try JSONDecoder().decode(Release.self, from: data)
+            let latest = rel.tag_name.hasPrefix("v")
+                ? String(rel.tag_name.dropFirst()) : rel.tag_name
+            if Self.newer(latest, than: current) {
+                updateVersion = latest
+                updateURL = rel.html_url
+            }
+        } catch { /* stay silent */ }
+    }
+
+    private static func newer(_ a: String, than b: String) -> Bool {
+        func parts(_ s: String) -> [Int] {
+            Array((s.split(separator: ".").map { Int($0) ?? 0 } + [0, 0, 0]).prefix(3))
+        }
+        return parts(b).lexicographicallyPrecedes(parts(a))
     }
 
     /// Preflight warnings for the current selection (ffmpeg, sample rates).
@@ -261,6 +292,17 @@ struct PopoverView: View {
             if !controller.isRunning, !warnings.isEmpty {
                 ForEach(warnings, id: \.self) { w in
                     Text("⚠ \(w)").font(.caption).foregroundStyle(.orange).lineLimit(2)
+                }
+            }
+            if let v = controller.updateVersion {
+                HStack {
+                    Text(t.updateAvailable(v)).font(.caption).foregroundStyle(.blue)
+                    Button(t.download) {
+                        if let u = controller.updateURL, let url = URL(string: u) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.link)
                 }
             }
 

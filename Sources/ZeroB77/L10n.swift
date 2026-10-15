@@ -53,6 +53,12 @@ struct T {
             : "\(inName) → \(outName) ch \(ch)–\(ch + 1) @ \(bitrate) kbps"
     }
 
+    // Updates (check only — installs stay manual, see MAINTAINING)
+    func updateAvailable(_ v: String) -> String {
+        pl ? "dostępna aktualizacja: \(v)" : "update available: \(v)"
+    }
+    var download: String { pl ? "pobierz" : "download" }
+
     // Preflight
     var ffmpegMissing: String { pl ? "Nie znaleziono ffmpeg — odpal: brew install ffmpeg"
         : "ffmpeg not found — run: brew install ffmpeg" }

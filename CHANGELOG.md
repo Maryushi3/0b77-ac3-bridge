@@ -5,6 +5,11 @@ you cut the release; if it's missing, GitHub auto-generates notes instead.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-15
+
+- Drag-and-drop DMG installer (background art, Applications shortcut)
+- Update check: notifies about newer GitHub releases, installs stay manual
+
 ## [0.1.0] - 2026-10-15 - first public release
 
 First native release. Menu-bar app replacing the Python prototype:
