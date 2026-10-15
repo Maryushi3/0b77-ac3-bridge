@@ -1,12 +1,13 @@
 import AppKit
 
-/// Menu-bar grid: the 0x0B77 sync word as 4x4 EL dots (MSB first, row-major).
+/// Menu-bar grid: the 0x0B77 sync word as 4x4 EL dots,
+/// one hex digit per column, left to right.
 /// Idle = template image (dim ghosts, follows the menu-bar theme);
 /// streaming = full-color cyan.
 enum MenuIcon {
     private static let bits = [
-        [0, 0, 0, 0],
-        [1, 0, 1, 1],
+        [0, 1, 0, 0],
+        [0, 0, 1, 1],
         [0, 1, 1, 1],
         [0, 1, 1, 1],
     ]

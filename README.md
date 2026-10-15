@@ -11,7 +11,8 @@ audio from a virtual input device, encodes it to AC-3, wraps it in IEC 61937
 pair of an output device.
 
 The icon is the sync word itself — `0000 1011 0111 0111` as a 4×4 grid of EL
-dots, themed after the Logitech Z5500 control pod that started this project.
+dots, one hex digit per column, themed after the Logitech Z5500 control pod
+that started this project.
 The menu-bar item shows the same grid: dim when idle, lit cyan while streaming.
 
 Concrete setup it was built for: BlackHole 16ch (5.1 on channels 1–6) as the
