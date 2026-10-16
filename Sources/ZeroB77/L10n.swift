@@ -35,6 +35,7 @@ struct T {
     var refresh: String { pl ? "Odśwież urządzenia" : "Refresh devices" }
     var quit: String { pl ? "Zakończ" : "Quit" }
     var about: String { pl ? "Informacje" : "About" }
+    var back: String { pl ? "Wróć" : "Back" }
     var checkUpdates: String { pl ? "Sprawdź aktualizacje" : "Check for Updates" }
     var upToDate: String { pl ? "Aktualna" : "Up to Date" }
     func version(_ v: String) -> String { pl ? "Wersja \(v)" : "Version \(v)" }

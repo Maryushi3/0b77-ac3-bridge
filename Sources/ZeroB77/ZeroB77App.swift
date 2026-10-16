@@ -13,7 +13,7 @@ struct ZeroB77App: App {
             PopoverView()
                 .environmentObject(settings)
                 .environmentObject(controller)
-                .frame(width: 380)
+                .frame(width: 336)
         } label: {
             Label { Text("0B77") } icon: { Image(nsImage: controller.menuImage) }
         }
@@ -312,11 +312,14 @@ struct PopoverView: View {
 
     var body: some View {
         let t = T(pl: settings.usePolish)
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            if controller.showAbout {
+                aboutBody(t)
+            } else {
             HStack(spacing: 8) {
                 Image(nsImage: NSApp.applicationIconImage)
                     .resizable()
-                    .frame(width: 36, height: 36)
+                    .frame(width: 30, height: 30)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("0B77 \(controller.appVersion)").font(.headline)
                     Text(t.appSubtitle).font(.caption).foregroundStyle(.secondary)
@@ -393,11 +396,6 @@ struct PopoverView: View {
                     Task { await controller.checkForUpdates(manual: true) }
                 }
                 Button(t.about) { controller.showAbout = true }
-                    .popover(isPresented: $controller.showAbout) {
-                        AboutView()
-                            .environmentObject(settings)
-                            .environmentObject(controller)
-                    }
             }
             .buttonStyle(.link)
             if let v = controller.updateVersion {
@@ -431,6 +429,7 @@ struct PopoverView: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut("q", modifiers: [.command])
             }
+            }
         }
         .padding(12)
         .onAppear {
@@ -444,7 +443,7 @@ struct PopoverView: View {
     // Symbol-led status: default label colors, red reserved for errors.
     @ViewBuilder
     private func statusSection(_ t: T) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 3) {
             if controller.isRunning, !controller.runSummary.isEmpty {
                 Label(controller.runSummary, systemImage: "waveform")
                     .font(.callout)
@@ -493,18 +492,7 @@ struct PopoverView: View {
         }
     }
 
-    private func deviceBinding(devices _: [AudioDeviceInfo],
-                               selection: Binding<AudioDeviceID?>) -> Binding<AudioDeviceID?> {
-        selection
-    }
-}
-
-struct AboutView: View {
-    @EnvironmentObject var settings: BridgeSettings
-    @EnvironmentObject var controller: BridgeController
-
-    var body: some View {
-        let t = T(pl: settings.usePolish)
+    private func aboutBody(_ t: T) -> some View {
         VStack(spacing: 8) {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
@@ -522,8 +510,15 @@ struct AboutView: View {
             .buttonStyle(.link)
             .font(.caption)
             Text(t.built(controller.buildDate)).font(.caption2).foregroundStyle(.tertiary)
+            Button(t.back) { controller.showAbout = false }
+                .buttonStyle(.link)
         }
         .padding(16)
         .frame(width: 260)
+    }
+
+    private func deviceBinding(devices _: [AudioDeviceInfo],
+                               selection: Binding<AudioDeviceID?>) -> Binding<AudioDeviceID?> {
+        selection
     }
 }
