@@ -3,10 +3,10 @@
 # Layout (icon positions, window frame, background) is applied with Finder via
 # osascript; if that fails (e.g. headless CI) the DMG still ships with the
 # symlink + background, just without the arranged layout.
-# Usage: Scripts/make-dmg.sh [version]  (default: 0.1.0)
+# Usage: Scripts/make-dmg.sh [version]  (default: 0.1.1)
 set -eu
 cd "$(dirname "$0")/.."
-VER="${1:-0.1.0}"
+VER="${1:-0.1.1}"
 DMG="0B77-$VER-macOS-arm64.dmg"
 VOL="0B77 $VER"
 WIN_W=660

@@ -13,6 +13,8 @@ final class AudioBridge: @unchecked Sendable {
     let outDevice: AudioDeviceID
     /// 1-based first output channel (uses it and the next).
     let firstChannel: Int
+    /// 1-based first input channel (captures it and the next 5 = the 5.1 bank).
+    let firstInChannel: Int
     let bitrate: Int
     var prefill: Int { didSet { prefill = max(1, min(8, prefill)) } }
 
@@ -35,8 +37,6 @@ final class AudioBridge: @unchecked Sendable {
     private var staticEnc: StaticEncoder?
     private var staticMode = false
     private var pending = Data() // sub-unit input remainder (static path)
-    /// "static" or "subprocess" once started — shown in the run summary.
-    private(set) var engineName = "?"
     private var inProcID: AudioDeviceIOProcID?
     private var outProcID: AudioDeviceIOProcID?
     private var inFormat = AudioStreamBasicDescription()
@@ -74,10 +74,11 @@ final class AudioBridge: @unchecked Sendable {
     var lastEncoderError: String { encoder?.stderrLast ?? "" }
 
     init(inDevice: AudioDeviceID, outDevice: AudioDeviceID,
-         firstChannel: Int, bitrate: Int, prefill: Int) {
+         firstChannel: Int, firstInChannel: Int, bitrate: Int, prefill: Int) {
         self.inDevice = inDevice
         self.outDevice = outDevice
         self.firstChannel = firstChannel
+        self.firstInChannel = max(1, firstInChannel)
         self.bitrate = bitrate
         self.prefill = max(1, min(8, prefill))
     }
@@ -91,7 +92,6 @@ final class AudioBridge: @unchecked Sendable {
         if !forceSubprocess, let se = try? StaticEncoder(bitrate: bitrate) {
             staticEnc = se
             staticMode = true
-            engineName = "static"
         } else {
             if !forceSubprocess {
                 NSLog("0B77: static encoder unavailable, falling back to ffmpeg child")
@@ -100,7 +100,6 @@ final class AudioBridge: @unchecked Sendable {
             try enc.start()
             encoder = enc
             staticMode = false
-            engineName = "subprocess"
         }
         lock.lock()
         _running = true
@@ -387,18 +386,19 @@ final class AudioBridge: @unchecked Sendable {
         guard frames > 0 else { return Data() }
 
         var out = Data(count: frames * 6 * 2)
+        let off = max(0, firstInChannel - 1) // capture bank offset
         out.withUnsafeMutableBytes { (dst: UnsafeMutableRawBufferPointer) in
             let s = dst.bindMemory(to: Int16.self).baseAddress!
             for i in 0..<frames {
                 for ch in 0..<6 {
                     var v: Int16 = 0
                     if isNonInterleaved {
-                        if ch < nBufs, let d = bufs[ch].mData {
+                        if off + ch < nBufs, let d = bufs[off + ch].mData {
                             v = sampleAsS16(from: d, frame: i, bytesPerSample: bytesPerSample, isFloat: isFloat)
                         }
                     } else {
                         let chans = max(6, Int(fmt.mChannelsPerFrame))
-                        v = sampleAsS16(from: firstData, frame: i * chans + ch,
+                        v = sampleAsS16(from: firstData, frame: i * chans + off + ch,
                                         bytesPerSample: bytesPerSample, isFloat: isFloat)
                     }
                     s[i * 6 + ch] = v.littleEndian

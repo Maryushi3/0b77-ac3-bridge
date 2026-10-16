@@ -190,6 +190,10 @@ final class BridgeController: ObservableObject {
             fail(t.onlyChannels(outDev.outputChannels))
             return
         }
+        if settings.firstInChannel + 5 > inDev.inputChannels {
+            fail(t.onlyInputChannels(inDev.inputChannels))
+            return
+        }
         // Safeguard: 1-2 are the speakers on a shared device (e.g. 18i20) —
         // encoded AC-3 there is full-scale noise. Require a second press.
         if settings.firstChannel <= 2, !speakerConfirmPending {
@@ -213,6 +217,7 @@ final class BridgeController: ObservableObject {
         }
         let b = AudioBridge(inDevice: inID, outDevice: outID,
                             firstChannel: settings.firstChannel,
+                            firstInChannel: settings.firstInChannel,
                             bitrate: settings.bitrate, prefill: settings.prefill)
         do {
             try b.start()
@@ -223,9 +228,8 @@ final class BridgeController: ObservableObject {
         }
         bridge = b
         isRunning = true
-        runSummary = t.runSummary(inName: inDev.name, outName: outDev.name,
-                                  ch: settings.firstChannel, bitrate: settings.bitrate)
-            + " (\(b.engineName))"
+        runSummary = t.runSummary(inName: inDev.name, inCh: settings.firstInChannel,
+                                  outName: outDev.name, ch: settings.firstChannel)
         watchInID = inID
         watchOutID = outID
         watchInRate = DeviceManager.nominalSampleRate(inID)
@@ -261,12 +265,29 @@ final class BridgeController: ObservableObject {
         }
     }
 
-    /// Keep the saved pair valid for the current output device.
-    func clampChannel(settings: BridgeSettings) {
+    /// First channels of 6-channel banks (hard 5.1): 1–6, 2–7, … never past
+    /// the device's last channel. Tiny devices fall back to pairs.
+    static func setRange(channels: Int) -> Range<Int> {
+        if channels >= 6 { return 1..<(min(60, channels - 4)) }
+        return 1..<(min(64, max(2, channels)))
+    }
+
+    /// First channels of stereo pairs (SPDIF out).
+    static func pairRange(channels: Int) -> Range<Int> {
+        1..<(min(64, max(2, channels)))
+    }
+
+    /// Keep both saved channel selections valid for the current devices.
+    func clampChannels(settings: BridgeSettings) {
         let outs = outputDevices.first(where: { $0.id == selectedOutputID })?.outputChannels ?? 20
-        let range = 1..<(min(64, max(2, outs)))
-        if !range.contains(settings.firstChannel) {
-            settings.firstChannel = range.lowerBound
+        let prange = Self.pairRange(channels: outs)
+        if !prange.contains(settings.firstChannel) {
+            settings.firstChannel = prange.lowerBound
+        }
+        let ins = inputDevices.first(where: { $0.id == selectedInputID })?.inputChannels ?? 6
+        let srange = Self.setRange(channels: ins)
+        if !srange.contains(settings.firstInChannel) {
+            settings.firstInChannel = srange.lowerBound
         }
     }
 

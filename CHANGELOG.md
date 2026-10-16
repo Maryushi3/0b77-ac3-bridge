@@ -5,6 +5,12 @@ you cut the release; if it's missing, GitHub auto-generates notes instead.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-16
+
+- Native menu-bar menu with submenus, standard About panel
+- In-process AC-3 encode; system output auto-switches in and back out
+- Separate input 5.1-bank and output pair selection
+
 ## [0.1.0] - 2026-10-15 - first public release
 
 First native release. Menu-bar app replacing the Python prototype:

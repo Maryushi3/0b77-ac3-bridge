@@ -21,8 +21,11 @@ struct T {
     func channelsOut(_ n: Int) -> String { pl ? "\(n) wyj." : "\(n) out" }
 
     // Settings
-    var firstChannelLabel: String { pl ? "Pierwszy kanał wyjścia" : "First output channel" }
+    var firstChannelLabel: String { pl ? "Kanały wyjścia" : "Output channels" }
     func channelPair(_ ch: Int) -> String { "\(ch)–\(ch + 1)" }
+    /// 6-channel bank starting at ch (hard 5.1): 1–6, 2–7, …
+    func channelSet(_ ch: Int) -> String { "\(ch)–\(ch + 5)" }
+    var inputChannelsLabel: String { pl ? "Kanały wejścia" : "Input channels" }
     var bitrateLabel: String { pl ? "Przepływność AC-3" : "AC-3 bitrate" }
     func bitrateUnit(_ b: Int) -> String { pl ? "\(b) kb/s" : "\(b) kbps" }
     var bufferLabel: String { pl ? "Bufor" : "Buffer" }
@@ -54,9 +57,8 @@ struct T {
     }
     var inputSilent: String { pl ? "wej. cisza" : "in silent" }
     func inputPeak(_ db: Int) -> String { pl ? "szczyt wej. \(db) dBFS" : "in peak \(db) dBFS" }
-    func runSummary(inName: String, outName: String, ch: Int, bitrate: Int) -> String {
-        pl ? "\(inName) → \(outName), kan. \(ch)–\(ch + 1) @ \(bitrate) kb/s"
-            : "\(inName) → \(outName) ch \(ch)–\(ch + 1) @ \(bitrate) kbps"
+    func runSummary(inName: String, inCh: Int, outName: String, ch: Int) -> String {
+        "\(inName) \(inCh)–\(inCh + 5) → \(outName) \(ch)–\(ch + 1)"
     }
 
     // Updates (check only — installs stay manual, see MAINTAINING)
@@ -90,6 +92,10 @@ struct T {
     func onlyChannels(_ n: Int) -> String {
         pl ? "Urządzenie wyjściowe ma tylko \(n) kanałów."
             : "Output device only has \(n) channels."
+    }
+    func onlyInputChannels(_ n: Int) -> String {
+        pl ? "Urządzenie wejściowe ma tylko \(n) kanałów."
+            : "Input device only has \(n) channels."
     }
     var speakerConfirm: String {
         pl ? "Kanały 1–2 to głośniki — zakodowany AC-3 to hałas o pełnej skali. Naciśnij Start ponownie, aby potwierdzić."

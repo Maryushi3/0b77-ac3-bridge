@@ -53,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
         statusItems = []
         controller.uiPolish = settings.usePolish
+        controller.clampChannels(settings: settings)
         let t = T(pl: settings.usePolish)
         let c = controller
 
@@ -71,8 +72,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             entries: c.outputDevices.map { ($0.id, "\($0.name) (\(t.channelsOut($0.outputChannels)))") },
             selected: c.selectedOutputID, enabled: !c.isRunning, action: #selector(pickOutput(_:)))
 
+        let ins = c.inputDevices.first(where: { $0.id == c.selectedInputID })?.inputChannels ?? 6
+        let inRange = Array(BridgeController.setRange(channels: ins))
+        addIntSubmenu(title: t.inputChannelsLabel, values: inRange, selected: settings.firstInChannel,
+                      enabled: !c.isRunning, label: { t.channelSet($0) }, action: #selector(pickInChannel(_:)))
+
         let outs = c.outputDevices.first(where: { $0.id == c.selectedOutputID })?.outputChannels ?? 20
-        let range = Array(1..<(min(64, max(2, outs))))
+        let range = Array(BridgeController.pairRange(channels: outs))
         addIntSubmenu(title: t.firstChannelLabel, values: range, selected: settings.firstChannel,
                       enabled: !c.isRunning, label: { t.channelPair($0) }, action: #selector(pickChannel(_:)))
         addIntSubmenu(title: t.bitrateLabel, values: [384, 448, 576, 640],
@@ -120,12 +126,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
         menu.addItem(actionItem(title: t.about, action: #selector(showAboutPanel)))
-        menu.addItem(actionItem(title: "\(t.quit) 0B77", action: #selector(NSApplication.terminate(_:))))
+        menu.addItem(actionItem(title: "\(t.quit) 0B77", action: #selector(NSApplication.terminate(_:)),
+                                target: NSApplication.shared))
     }
 
-    private func actionItem(title: String, action: Selector, key: String = "") -> NSMenuItem {
+    private func actionItem(title: String, action: Selector, key: String = "",
+                            target: AnyObject? = nil) -> NSMenuItem {
         let it = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        it.target = self
+        it.target = target ?? self
         return it
     }
 
@@ -214,6 +222,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func pickChannel(_ sender: NSMenuItem) {
         guard let v = (sender.representedObject as? NSNumber)?.intValue else { return }
         MainActor.assumeIsolated { [weak self] in self?.settings?.firstChannel = v }
+    }
+
+    @objc private func pickInChannel(_ sender: NSMenuItem) {
+        guard let v = (sender.representedObject as? NSNumber)?.intValue else { return }
+        MainActor.assumeIsolated { [weak self] in self?.settings?.firstInChannel = v }
     }
 
     @objc private func pickBitrate(_ sender: NSMenuItem) {
