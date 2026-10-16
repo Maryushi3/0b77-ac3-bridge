@@ -11,6 +11,8 @@ BUILD=".build/$CFG"
 # Release version baked into the plist; CI passes VERSION=vX.Y.Z worth.
 # Local default matches the current release line.
 VER="${VERSION:-0.1.0}"
+# Build timestamp for the About window.
+BUILD_DATE="$(date -u +%Y-%m-%d)"
 
 swift build -c "$CFG"
 
@@ -38,6 +40,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>0B77</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleShortVersionString</key><string>$VER</string>
+  <key>ZeroB77BuildDate</key><string>$BUILD_DATE</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSUIElement</key><true/>
   <key>CFBundleIconFile</key><string>0B77</string>

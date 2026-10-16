@@ -39,12 +39,26 @@ final class BridgeController: ObservableObject {
     @Published var uiPolish = false
     /// Menu-bar grid state; the icon itself shows idle vs streaming.
     @Published var menuImage: NSImage = MenuIcon.image(streaming: false)
+    /// About popup visibility (kept here: @State macros are flaky under CLT SwiftPM).
+    @Published var showAbout = false
     /// Newer GitHub release tag (e.g. "0.1.1"); nil when up to date / offline.
     @Published var updateVersion: String?
     @Published var updateURL: String?
+    /// Transient result of a manual update check ("Up to Date" / cleared).
+    @Published var updateNote: String?
+
+    /// From the bundle (stamped by bundle.sh) — shown in header and About.
+    var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–"
+    }
+    var buildDate: String {
+        Bundle.main.object(forInfoDictionaryKey: "ZeroB77BuildDate") as? String ?? "–"
+    }
 
     private var bridge: AudioBridge?
     private var timer: Timer?
+    // Previous system default output, restored on stop (nil = already Ours).
+    private var savedDefaultOutputID: AudioDeviceID?
     // Watchdog: device set + sample rates captured at Start; tick() stops on change.
     private var watchInID: AudioDeviceID?
     private var watchOutID: AudioDeviceID?
@@ -68,7 +82,9 @@ final class BridgeController: ObservableObject {
 
     /// One-shot update check against GitHub releases. Silent on failure
     /// (offline, no releases yet) — installs stay manual regardless.
-    private func checkForUpdates() async {
+    /// Manual checks report "up to date" instead of staying silent.
+    func checkForUpdates(manual: Bool = false) async {
+        updateNote = nil
         struct Release: Decodable { var tag_name: String; var html_url: String }
         guard let url = URL(string: "https://api.github.com/repos/Maryushi3/0b77-ac3-bridge/releases/latest"),
               let current = Bundle.main.object(
@@ -82,6 +98,10 @@ final class BridgeController: ObservableObject {
             if Self.newer(latest, than: current) {
                 updateVersion = latest
                 updateURL = rel.html_url
+            } else if manual {
+                updateVersion = nil
+                updateURL = nil
+                updateNote = T(pl: uiPolish).upToDate
             }
         } catch { /* stay silent */ }
     }
@@ -186,12 +206,26 @@ final class BridgeController: ObservableObject {
             return
         }
         speakerConfirmPending = false
+        // Route system audio into the bridge input; restored on stop/quit/failure.
+        let previousDefault = DeviceManager.defaultOutputDevice()
+        if previousDefault != inID {
+            do {
+                try DeviceManager.setDefaultOutputDevice(inID)
+            } catch {
+                lastError = t.couldNotStart(error.localizedDescription)
+                return
+            }
+            savedDefaultOutputID = previousDefault
+        } else {
+            savedDefaultOutputID = nil
+        }
         let b = AudioBridge(inDevice: inID, outDevice: outID,
                             firstChannel: settings.firstChannel,
                             bitrate: settings.bitrate, prefill: settings.prefill)
         do {
             try b.start()
         } catch {
+            restoreDefaultOutput()
             lastError = t.couldNotStart(error.localizedDescription)
             return
         }
@@ -219,6 +253,15 @@ final class BridgeController: ObservableObject {
         speakerConfirmPending = false
         watchInID = nil
         watchOutID = nil
+        restoreDefaultOutput()
+    }
+
+    /// Give the system output back (best-effort; never fails a stop).
+    private func restoreDefaultOutput() {
+        if let saved = savedDefaultOutputID {
+            try? DeviceManager.setDefaultOutputDevice(saved)
+            savedDefaultOutputID = nil
+        }
     }
 
     func applyPrefill(_ n: Int) {
@@ -269,44 +312,22 @@ struct PopoverView: View {
 
     var body: some View {
         let t = T(pl: settings.usePolish)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(t.appName).font(.headline)
-                Text(t.appSubtitle).font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Picker(t.languageLabel, selection: $settings.language) {
-                    Text(t.languageSystem).tag("system")
-                    Text("English").tag("en")
-                    Text("Polski").tag("pl")
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .fixedSize()
-            }
-            if controller.isRunning, !controller.runSummary.isEmpty {
-                Text(controller.runSummary)
-                    .font(.caption)
-                    .foregroundStyle(.green)
-                    .lineLimit(2)
-            }
-            let warnings = controller.preflightWarnings()
-            if !controller.isRunning, !warnings.isEmpty {
-                ForEach(warnings, id: \.self) { w in
-                    Text("⚠ \(w)").font(.caption).foregroundStyle(.orange).lineLimit(2)
-                }
-            }
-            if let v = controller.updateVersion {
-                HStack {
-                    Text(t.updateAvailable(v)).font(.caption).foregroundStyle(.blue)
-                    Button(t.download) {
-                        if let u = controller.updateURL, let url = URL(string: u) {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                    .buttonStyle(.link)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 36, height: 36)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("0B77 \(controller.appVersion)").font(.headline)
+                    Text(t.appSubtitle).font(.caption).foregroundStyle(.secondary)
                 }
             }
 
+            statusSection(t)
+
+            Divider()
+
+            Form {
             Picker(t.inputLabel, selection: deviceBinding(
                 devices: controller.inputDevices,
                 selection: $controller.selectedInputID)) {
@@ -338,21 +359,19 @@ struct PopoverView: View {
                 clampChannel(settings: settings)
             }
 
-            HStack {
-                Picker(t.bitrateLabel, selection: $settings.bitrate) {
-                    ForEach([384, 448, 576, 640], id: \.self) { b in
-                        Text(t.bitrateUnit(b)).tag(b)
-                    }
+            Picker(t.bitrateLabel, selection: $settings.bitrate) {
+                ForEach([384, 448, 576, 640], id: \.self) { b in
+                    Text(t.bitrateUnit(b)).tag(b)
                 }
-                .pickerStyle(.menu)
-                .disabled(controller.isRunning)
-                Picker(t.bufferLabel, selection: $settings.prefill) {
-                    ForEach(1...8, id: \.self) { n in
-                        Text(t.bufferRow(n)).tag(n)
-                    }
+            }
+            .disabled(controller.isRunning)
+
+            Picker(t.bufferLabel, selection: $settings.prefill) {
+                ForEach(1...8, id: \.self) { n in
+                    Text(t.bufferRow(n)).tag(n)
                 }
-                .pickerStyle(.menu)
-                .onChange(of: settings.prefill) { _, n in controller.applyPrefill(n) }
+            }
+            .onChange(of: settings.prefill) { _, n in controller.applyPrefill(n) }
             }
 
             HStack {
@@ -360,7 +379,8 @@ struct PopoverView: View {
                        : controller.speakerConfirmPending ? t.confirmSpeakers : t.start) {
                     controller.toggle(settings: settings)
                 }
-                    .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 Button(t.refresh) {
                     controller.refreshDevices()
                     controller.restoreSelection(settings: settings)
@@ -368,28 +388,48 @@ struct PopoverView: View {
                 .disabled(controller.isRunning)
             }
 
-            Text(controller.statusLine)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(5)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let err = controller.lastError {
-                Text(err).font(.caption).foregroundStyle(.red).lineLimit(4)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Button(t.quit) { NSApplication.shared.terminate(nil) }
-                .buttonStyle(.link)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(t.madeBy).font(.caption2).foregroundStyle(.tertiary)
-                Button(t.repoLabel) {
-                    if let url = URL(string: t.repoURL) {
-                        NSWorkspace.shared.open(url)
-                    }
+            HStack {
+                Button(t.checkUpdates) {
+                    Task { await controller.checkForUpdates(manual: true) }
                 }
-                .buttonStyle(.link)
-                .font(.caption2)
+                Button(t.about) { controller.showAbout = true }
+                    .popover(isPresented: $controller.showAbout) {
+                        AboutView()
+                            .environmentObject(settings)
+                            .environmentObject(controller)
+                    }
+            }
+            .buttonStyle(.link)
+            if let v = controller.updateVersion {
+                HStack {
+                    Label(t.updateAvailable(v), systemImage: "arrow.down.circle")
+                        .font(.callout)
+                    Button(t.download) {
+                        if let u = controller.updateURL, let url = URL(string: u) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.link)
+                }
+            } else if let note = controller.updateNote {
+                Text(note).font(.caption).foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            HStack {
+                Picker(t.languageLabel, selection: $settings.language) {
+                    Text(t.languageSystem).tag("system")
+                    Text("English").tag("en")
+                    Text("Polski").tag("pl")
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .fixedSize()
+                Spacer()
+                Button(t.quit) { NSApplication.shared.terminate(nil) }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("q", modifiers: [.command])
             }
         }
         .padding(12)
@@ -399,6 +439,45 @@ struct PopoverView: View {
             clampChannel(settings: settings)
         }
         .onChange(of: settings.language) { _, _ in controller.uiPolish = settings.usePolish }
+    }
+
+    // Symbol-led status: default label colors, red reserved for errors.
+    @ViewBuilder
+    private func statusSection(_ t: T) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if controller.isRunning, !controller.runSummary.isEmpty {
+                Label(controller.runSummary, systemImage: "waveform")
+                    .font(.callout)
+            } else {
+                Label(controller.statusLine, systemImage: "stop.circle")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            if !controller.isRunning {
+                ForEach(controller.preflightWarnings(), id: \.self) { w in
+                    Label(w, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            if controller.isRunning {
+                Text(controller.statusLine)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(5)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let err = controller.lastError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 
     private var channelRange: Range<Int> {
@@ -417,5 +496,34 @@ struct PopoverView: View {
     private func deviceBinding(devices _: [AudioDeviceInfo],
                                selection: Binding<AudioDeviceID?>) -> Binding<AudioDeviceID?> {
         selection
+    }
+}
+
+struct AboutView: View {
+    @EnvironmentObject var settings: BridgeSettings
+    @EnvironmentObject var controller: BridgeController
+
+    var body: some View {
+        let t = T(pl: settings.usePolish)
+        VStack(spacing: 8) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 64, height: 64)
+            Text("0B77").font(.headline)
+            Text(t.version(controller.appVersion)).font(.caption)
+            Text(t.appSubtitle).font(.caption).foregroundStyle(.secondary)
+            Divider()
+            Text(t.madeBy).font(.caption)
+            Button(t.repoLabel) {
+                if let url = URL(string: t.repoURL) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .buttonStyle(.link)
+            .font(.caption)
+            Text(t.built(controller.buildDate)).font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(16)
+        .frame(width: 260)
     }
 }

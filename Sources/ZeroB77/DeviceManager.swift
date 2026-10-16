@@ -98,4 +98,35 @@ enum DeviceManager {
         guard AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &rate) == noErr else { return 0 }
         return rate
     }
+
+    /// System default output (what the user hears outside the bridge).
+    static func defaultOutputDevice() -> AudioDeviceID? {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var id: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &id) == noErr,
+            id != 0
+        else { return nil }
+        return id
+    }
+
+    static func setDefaultOutputDevice(_ id: AudioDeviceID) throws {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var v = id
+        let status = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size), &v)
+        guard status == noErr else {
+            throw NSError(domain: "0B77", code: 20,
+                          userInfo: [NSLocalizedDescriptionKey:
+                              "Could not switch system output (OSStatus \(status))"])
+        }
+    }
 }

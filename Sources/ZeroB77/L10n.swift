@@ -34,6 +34,11 @@ struct T {
     var confirmSpeakers: String { pl ? "Potwierdź: start na 1–2" : "Confirm: start on 1–2" }
     var refresh: String { pl ? "Odśwież urządzenia" : "Refresh devices" }
     var quit: String { pl ? "Zakończ" : "Quit" }
+    var about: String { pl ? "Informacje" : "About" }
+    var checkUpdates: String { pl ? "Sprawdź aktualizacje" : "Check for Updates" }
+    var upToDate: String { pl ? "Aktualna" : "Up to Date" }
+    func version(_ v: String) -> String { pl ? "Wersja \(v)" : "Version \(v)" }
+    func built(_ d: String) -> String { pl ? "Zbudowano \(d)" : "Built \(d)" }
     var madeBy: String { pl ? "Przygotował Mary, z pomocą Meta Spark 1.3" : "Made by Mary, with help of Meta Spark 1.3" }
     var repoLabel: String { "github.com/Maryushi3/0b77-ac3-bridge" }
     var repoURL: String { "https://github.com/Maryushi3/0b77-ac3-bridge" }

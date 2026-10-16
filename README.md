@@ -45,9 +45,10 @@ Made by Mary, with help of Meta Spark 1.3.
 
 Pick input (your 6ch virtual device), output, and the channel pair carrying
 the S/PDIF feed (e.g. 9–10 on an 18i20 whose mixer routes them to S/PDIF),
-then start. The menu icon shows a dim dot grid when idle and a lit cyan grid
-while streaming; the popover reports buffer fill, dropouts, and input level.
-
+then start. Starting routes the system output to the bridge input automatically
+(previous output restored on stop). The menu icon shows a dim dot grid when
+idle and a lit cyan grid while streaming; the popover reports buffer fill,
+dropouts, and input level.
 Safety rules the app enforces:
 
 - Input and output can't be the same device.
